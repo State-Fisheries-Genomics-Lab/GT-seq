@@ -1,0 +1,90 @@
+---
+title: "GT-seq Genotyping SOP"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_collapsed: false
+---
+
+```{r, message=FALSE, warning=FALSE}
+require(tidyverse)
+require(DiagrammeR)
+require(poppr)
+require(genepop)
+require(graph4lg)
+require(related)
+require(adegenet)
+```
+
+
+# Readme
+
+This is document is an R notebook. If you'd like view to pre-rendered figures, read a summary of analysis and interact with code, please open the relevant html file in a browser. 
+
+
+To conduct a similar analyses on your computer, edit or run code: clone this repository into a directory on you r local machine and open the .Rproj file in Rstudio. 
+
+# Rationale 
+
+Genotyping-in-Thousands by sequencing (GT-seq) is a cost effective method developed by Campbell et al (2015) to genotype up to thousands of samples at a small (~500) set of markers using the illumina platform. 
+
+This document:   
+(a) outlines the bioinformatic procedures for processing raw GT-seq reads to a fully filtered SNP dataset according to the standards adopted by the State Fisheries Genomics Lab at Oregon State University  
+(b) shares instructions for setting up the environment to run the scripts  
+(c) provides an example detailed protocol genotyping _Oncorhynchus mykiss_ samples with figures and results  
+(d) directs GT-seq users to relevant metadata to conduct their own genotyping (i.e probe sequences) 
+
+# GTseq outline
+
+```{r, fig.cap="Typical Gt-seq genotyping flowchart: nodes are data, edges are scripts"}
+grViz("digraph flowchart {
+      # node definitions with substituted label text
+      node [fontname = Helvetica, shape = rectangle]        
+      tab1 [label = '@@1']
+      tab2 [label = '@@2']
+      tab3 [label = '@@3']
+      tab4 [label = '@@4']
+      tab5 [label = '@@5']
+      tab6 [label = '@@6']
+      tab7 [label = '@@7']
+      tab8 [label = '@@8']
+      # edge definitions with the node IDs
+      tab1 -> tab2 [label = 'GTseq_BarcodeSplit']
+      tab2 -> tab3 [label = 'GTseq_Genotyper']
+      tab3 -> tab4 [label = 'GTseq_genocompile']
+      tab4 -> tab5 [label = 'filtering']
+      tab4 -> tab6 [label = 'GTseq_summaryfigs']
+      tab3 -> tab7 [label = 'GTseq_genocompilecounts']
+      tab7 -> tab5 
+      tab1 -> tab8 [label = 'GTseq_seqtest']
+      tab7 -> tab4 [label = 'GTseq_Omysex']
+      tab6 -> tab5
+      }
+      [1]: 'Raw Reads'
+      [2]: 'Demultiplezed fastqs'
+      [3]: 'Individual genotypes'
+      [4]: 'raw GTseq dataset'
+      [5]: 'final filtered dataset'
+      [6]: 'summary figures'
+      [7]: 'read counts'
+      [8]: 'marker info'
+      
+      ")
+
+```
+
+# Environment setup and how to use this document
+
+This SOP is run in two environments, the OSU cluster and a local (your own computer) instance of R on a unix based machine (i.e. a mac). With some modifications this script can be run entirely on the cluster, or on the cluster and a windows based machine. Just run the unix based commands on the cluster or in a unix/bash based terminal on a windows machine like cygwin or the bash shell available on windows 10 [install link here](https://docs.microsoft.com/en-us/windows/wsl/install-win10) .
+
+Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see in full detail. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. Copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol.  
+
+## OSU Cluster Setup
+
+__Scripts__
+In order to run the GTseq, you must have a copy of the most current GTseq scripts stored on the cluster. As there are multiple versions of the scripts, it is reccomended to download them into a directory on 
+
+__Perl and Python Libraries__
