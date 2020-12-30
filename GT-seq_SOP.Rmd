@@ -76,15 +76,132 @@ grViz("digraph flowchart {
 
 ```
 
-# Environment setup and how to use this document
+The GTseq pipeline consists of a handful of perl and python scripts to process rw sequencing reads to a fully filtered SNP dataset. Here's a quick reference to each of the steps.
 
-This SOP is run in two environments, the OSU cluster and a local (your own computer) instance of R on a unix based machine (i.e. a mac). With some modifications this script can be run entirely on the cluster, or on the cluster and a windows based machine. Just run the unix based commands on the cluster or in a unix/bash based terminal on a windows machine like cygwin or the bash shell available on windows 10 [install link here](https://docs.microsoft.com/en-us/windows/wsl/install-win10) .
+__Sequencing QC__  
+- Check that the reads look good from the sequencer with fastqc or similar program  
 
-Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see in full detail. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. Copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol.  
+__GT-seq Scripts__  
+- Demultiplex reads: The first step is to demultiplex sequencing data if demuxed files are not provided by sequencing center using the GTseq_Barcode_Split_MP.py script  
+- Call genotypes: Use GTseq_Genotyper_v3.1.pl to call genotypes on demultiplexed reads.  
+- (Optional) Call Sex Genotypes: If species has unique script for calling the sex markers (O. mykiss and O. tshawytscha), run these as well  
+- Compile: After all the individual genotypes are called, compile them into a single output using the GTseq_GenoCompile_v3.pl script.  
+
+__QAQC Check:__  
+- Check positive and negative controls (for plate flipping, other library prep errors)  
+- Check known genotype controls if included (het winter summer controls)  
+- Check technical replicates  
+- Remove controls and replicates if all looks good  
+
+__Filtering:__  
+- IFI_cutoff = 2.5  (remove individuals with low confidence)  
+- GTperc_cutoff=90 (exclude individuals with greater than 10% missing data)  
+- Missingness (loci) > 20% (remove loci with >20% missing data)
+- Missingness (loci) > 10% (examine moderately bad loci for incorrect allele correction issues and attempt to rescue)  
+- Remove monomorphic SNPs  
+- Remove duplicated individuals  
+
+# Environment setup and how to use
+
+This SOP is run in two environments, the OSU cluster and a local (your own computer) instance of R on a unix based machine (i.e. a mac). With some modifications this script can be run entirely on the cluster, or on the cluster and a windows based machine (just run the unix based commands on the cluster or in a unix/bash based terminal on a windows machine like cygwin or the bash shell available on windows 10 [install link here](https://docs.microsoft.com/en-us/windows/wsl/install-win10) ).
+
+Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see the commands and more  details about a step. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. Copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol. See the code chunk below on how to do this.
+
+Paths to files and scripts in the SOP are on David Dayan's directories, you will need to modify the scripts to reflect your own paths.
+
+```{bash, eval = FALSE}
+# Local
+
+# note: this is optional and only needed if you want to follow along with the example code on your own machine
+
+# move to your working directory 
+# create a directory for this repository and move inside
+mkdir GT-seq
+cd GT-seq
+
+#copy the whole repository using git clone
+git clone https://github.com/State-Fisheries-Genomics-Lab/GT-seq.git
+
+# after you've cloned the repository, open the file GT-seq.Rproj in Rstudio for all features
+
+```
+
 
 ## OSU Cluster Setup
 
-__Scripts__
-In order to run the GTseq, you must have a copy of the most current GTseq scripts stored on the cluster. As there are multiple versions of the scripts, it is reccomended to download them into a directory on 
+__Scripts__  
+In order to run the GTseq, you must have a copy of the most current GTseq scripts stored on the cluster. As there are multiple versions of the scripts, it is reccomended to download them into directory on the cluster directly from the github repository, which is actively maintained.
 
-__Perl and Python Libraries__
+_Option A:_ File transfer GUI  
+
+Move all the files from the [script directory](https://github.com/State-Fisheries-Genomics-Lab/GT-seq/tree/main/GT-seq_scripts) to your own directory on the server using filezilla or whatever file transfer software you like.
+
+_Option B:_ Git  
+
+You can also clone whole repository onto the server with git and then move relevant files to where you want them
+```{bash, eval = FALSE}
+
+# SERVER
+
+# clone the repository somewhere temporary
+mkdir ~/tmp
+cd ~/tmp
+git clone https://github.com/State-Fisheries-Genomics-Lab/GT-seq
+
+
+# choose home directory for your software
+# make directory for GTseq scripts and move files inside
+mkdir /dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/
+mv  ~/tmp/GT-seq/GT-seq_scripts/* /dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/
+
+#delete your temporary repo
+bash #default shell is zcsh which requires you to confirm EVERY SINGLE file deletion
+rm -r ~/tmp/* #caution scary, be sure there's no typo here
+rmdir ~/tmp
+```
+
+
+__Perl and Python Libraries__  
+
+The GT-seq pipeline uses both perl and python. All of the relevant libraries should be installed on the server except StringApprox. You will need to install StringApprox and configure your server envirnment so it is included it in your path.
+
+_Installing:_  
+```{bash, eval = FALSE}
+
+# SERVER
+
+# You have three options to install String::Approx, I confirmed the first one works, but the others may be even simpler
+
+#### Option 1: make
+
+# first download the tarball for String Approx here ( https://metacpan.org/release/String-Approx ) into a temporary directory on the server
+
+# then, unpack the tarball and follow the instructions in the readme (below) 
+perl Makefile.PL
+        make
+        make test
+        make install
+
+#### Option 2: Conda
+conda install -c bioconda perl-string-approx
+
+#### Option 3: cpan
+perl -MCPAN -e shell
+install String::Approx
+```
+
+_Setting the environment:_  
+
+Before running any scripts that require the String::Approx module, you must set the environment with the following commands. This will be noted in the example script but can also be found here.
+
+```{bash, eval = FALSE}
+
+#SERVER
+
+setenv PERL5LIB ~/perl5/lib/perl5/x86_64-linux-thread-multi/ #for tcsh (default shell on server)
+
+export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/' # if using bash as your shell
+
+```
+
+
