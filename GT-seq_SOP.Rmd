@@ -17,6 +17,7 @@ require(genepop)
 require(graph4lg)
 require(related)
 require(adegenet)
+require(knitr)
 ```
 
 
@@ -105,7 +106,9 @@ __Filtering:__
 
 This SOP is run in two environments, the OSU cluster and a local (your own computer) instance of R on a unix based machine (i.e. a mac). With some modifications this script can be run entirely on the cluster, or on the cluster and a windows based machine (just run the unix based commands on the cluster or in a unix/bash based terminal on a windows machine like cygwin or the bash shell available on windows 10 [install link here](https://docs.microsoft.com/en-us/windows/wsl/install-win10) ).
 
-Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see the commands and more  details about a step. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. Copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol. See the code chunk below on how to do this.
+Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see the commands and more  details about a step. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. There are also full scripts submitted as jobs to the server. These need to be saved as a file and submitted with the appropriate command from the server scheduler such as qsub of SGE_Batch.
+
+Copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol. See the code chunk below on how to do this.
 
 Paths to files and scripts in the SOP are on David Dayan's directories, you will need to modify the scripts to reflect your own paths.
 
@@ -163,7 +166,7 @@ rmdir ~/tmp
 
 __Perl and Python Libraries__  
 
-The GT-seq pipeline uses both perl and python. All of the relevant libraries should be installed on the server except StringApprox. You will need to install StringApprox and configure your server envirnment so it is included it in your path.
+The GT-seq pipeline uses both perl and python. All of the relevant libraries should be installed on the server except StringApprox. You will need to install StringApprox and configure your server environment so it is included it in your path.
 
 _Installing:_  
 ```{bash, eval = FALSE}
@@ -192,7 +195,7 @@ install String::Approx
 
 _Setting the environment:_  
 
-Before running any scripts that require the String::Approx module, you must set the environment with the following commands. This will be noted in the example script but can also be found here.
+Before running any scripts that require the String::Approx module, you must set the environment with the following commands. This will be noted in the example scripts but can also be found here.
 
 ```{bash, eval = FALSE}
 
@@ -203,5 +206,210 @@ setenv PERL5LIB ~/perl5/lib/perl5/x86_64-linux-thread-multi/ #for tcsh (default 
 export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/' # if using bash as your shell
 
 ```
+
+# Panel Info
+
+[This repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) contains all the files needed to run the pipeline on new data and additional information about the panel markers. See readmes in each subdirectory for up to date contents.
+
+__Probe_Sequences__  
+The probe sequences used by the genotyper script to call SNPs at the panel markers. [Link here](https://github.com/State-Fisheries-Genomics-Lab/GT-seq/tree/main/Probe_Sequences)
+
+__Panel Info__  
+Information about the panel markers such as amplicon sequences, annotations, sources, primer and probe sequences etc. [Link here](https://github.com/State-Fisheries-Genomics-Lab/GT-seq/tree/main/Panel_Info)
+
+__Marker Mapping__  
+Results from mapping studies.  [Link here](https://github.com/State-Fisheries-Genomics-Lab/GT-seq/tree/main/Marker_mapping)  
+
+# Example Script  
+
+Here we is an example script of a full genotyping pipeline from raw reads to fully filtered SNP dataset.
+
+## Data Summary
+
+The example dataset uses fall run and half-pounder steelhead from the Rogue River. 
+
+__Sample Summary__
+
+Let's gather all the metadata and summarize:
+```{r, message=FALSE, warning=FALSE}
+# LOCAL R
+
+#intake files
+half_2019_intake <- readxl::read_xlsx("example_data/metadata/STHP Intake form Spread sheet 2019.xlsx", sheet = 1)
+fall_intake <- readxl::read_xlsx("example_data/metadata/Rogue Adult Summer and Winter (06 11 20).xlsx", sheet = 1)
+
+#merge intakes
+# first clean them up a bit to make merging easier
+half_2019_intake <- half_2019_intake[,c(1,2)]
+half_2019_intake$run <- "halfpounder"
+half_2019_intake$year <- "2019"
+colnames(half_2019_intake) <- c("ID", "Date", "run", "year")
+
+fall_intake <- subset(fall_intake, Run == "Summer")
+fall_intake <- fall_intake[,c(1,3,6)]
+colnames(fall_intake) <- c("ID", "Date", "run")
+fall_intake$run <- "fall"
+fall_intake$year <- "2019"
+
+meta_data <- bind_rows( half_2019_intake, fall_intake)
+
+kable(meta_data %>%
+  group_by(run, year) %>%
+  tally())
+```
+
+__Sequencing Data Summary__
+
+Data came demultiplexed from sequencing center. Location in code chunk below
+
+```{bash, eval = FALSE}
+# SERVER
+
+/dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux - 2019 fall and 2019 halfpounder
+```
+
+Clusters: 409,149,535  
+Yield (mbase): 61,782  
+% >Q30 bases: 87.13  
+Average Qual: 37.18  
+
+Ran fastqc report (not included in SOP)
+
+
+## Demultiplex
+
+The first step is to demultiplex the raw sequencing file using the i5 and i7 indexes. We can actually skip this because the sequencing center already performed a demux. Instead, we just copy the demuxed files and give them more reasonable name.  
+
+```{bash, eval=FALSE}
+# SERVER
+
+#first move the demuxed files over
+cp /nfs2/hts/illumina/200723_J00107_0245_AHHLG2BBXY_1504/L23/*Omy* /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux
+
+cp /nfs2/hts/illumina/200723_J00107_0245_AHHLG2BBXY_1504/L23/*positive* /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux
+
+cp /nfs2/hts/illumina/200723_J00107_0245_AHHLG2BBXY_1504/L23/negative* /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux
+
+#next rename to something easier to work with, this command takes the last 20 characters and tosses the rest
+
+for file in ./*
+do
+   mv "$file" "${file:20}"
+done
+```
+
+
+If, instead you are supplied with multiplexed fastq files (boo) you can use the GTseq scripts to demultiplex. First you need to generate a key file.
+
+```{r, eval=FALSE}
+# LOCAL R
+
+# example: Sample,PlateID,i7_name,i7_sequence,i5_name,i5_sequence
+#          Sample123,P1234,i001,ACCGTA,25,CCCTAA
+#          Sample321,P1234,i001,ACCGTA,26,GGCACA
+
+#first lets get the index sequences 
+index2020 <- read_tsv("example_data/metadata/index_2020.txt")
+colnames(index2020) <- c("Sample","PlateID","i7_name","i7_sequence","i5_name","i5_sequence")
+write_csv(index2020, "example_data/metadata/index_2020_lane.csv")
+```
+
+Then you run the script.
+
+```{bash, eval = FALSE}
+# SERVER
+
+#note this is from Sandra's protocol so the directories are different, but still same approach
+
+#Set directory
+usedir='/nfs1/FW_HMSC/OMalley_Lab/bohns/GTseq/OmyRogue'
+
+#First argument is list of barcodes and second argument is .fastq file.
+#Make sure you dos2unix the barcode file if you made it in Excel or Windows!
+
+mkdir $usedir'/sample_fastqs'
+cd $usedir'/sample_fastqs'
+
+#here is the command you will submit
+python '/nfs1/FW_HMSC/OMalley_Lab/bohns/GTseq/pipeline/GTseq_BarcodeSplit_MPargs.py' $usedir'/OmyROGR_index-list.csv' '/nfs1/FW_HMSC/OMalley_Lab/bohns/GTseq/RAW_READS/OmyROGROtsFERHCLAR.fq'
+
+#here is how to wrap it correctly for submission to the server queue
+SGE_Batch -q harold -r omysex -c "python '/nfs1/FW_HMSC/OMalley_Lab/bohns/GTseq/pipeline/GTseq_BarcodeSplit_MPargs.py' $usedir'/OmyROGR_index-list.csv' '/nfs1/FW_HMSC/OMalley_Lab/bohns/GTseq/RAW_READS/OmyROGROtsFERHCLAR.fq'"
+
+
+
+```
+
+
+## Genotype
+
+Next we'll run the GTseq genotyper (v3.1) script on each fastq file to generate the individual genotypes (.genos) . Note that there are many copies of the genotyper script. 3.1 is the current version (assymetrical genotype caller bug fixed)
+
+We need to run this script for each demultiplexed fastq. To speed this up we'll use an array job. The code chunk below contains an example array job script. To run the job, you'll save the script on the server and run it using the _qsub_ command.  
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#$ -S /bin/bash
+
+#$ -t 1-554
+
+#$ -tc 20
+
+#$ -N GTseq-genotyperv3
+
+#$ -cwd
+
+#$ -o $JOB_NAME_$TASK_ID.out
+
+#$ -e $JOB_NAME_$TASK_ID.err
+export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/'
+
+FASTQS=(`ls /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux/*fastq`)
+INFILE=${FASTQS[$SGE_TASK_ID -1]}
+OUTFILE=$(basename ${INFILE%.fastq.gz}.genos)
+
+GTSEQ_GENO="/dfs/FW_HMSC/Omalley_Lab/dayan/software/GTseq-Pipeline/GTseq_Genotyper_v3.1.pl
+"
+
+PROBE_SEQS="/dfs/FW_HMSC/Omalley_Lab/dayan/software/GTseq-Pipeline/Omy_GTseq390_ProbeSeqs.csv"
+
+perl $GTSEQ_GENO $PROBE_SEQS $INFILE > $OUTFILE
+
+#save this code chunk as a file on the server and submit this with qsub -q harold scriptname from the directory you want the output .genos files
+```
+
+Some notes about this script:  
+__-t :__ this is the total number of task id to use. this script will iterate over this list. so if you have 100 individuals to genotype set this to 1-100.   
+__-tc:__ this is the throttle. the value used in the script above (20), means we will submit the 554 separate commands in batches of 20 until it is done  
+__submitting__: I usually store all of the scripts I will submit to the server in a directory named "sge," so if I wanted to submit this script (named gtseq_geno.txt) i'd submit the command qsub -q harold path/to/my/scripts/sge/gtseq_geno.txt  . you can check the progress with the qstat command.
+
+__Sex Genotyper__
+
+After the genotypes are written for the panel, we add the sex genotyper. 
+```{bash, eval =FALSE}
+# SERVER
+
+#the omysex script is hardcoded to require the fastqs and genos to all be in a single collective directory ... 
+#rather than try to fix this hardcoding in the script, I just coped with it and temporarily copied all the fastqs into the .genos driectory then deleted them after i was done
+
+cp /nfs1/FW_HMSC/OMalley_Lab/bohns/GTseq/OmyRogue/baseline/sample_fastqs/*fastq ./
+cp /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux/halfpound_2018/*fastq ./
+cp /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux/*fastq ./
+
+#oops it seems like the omysex script doesn't like the naming convention I used lets rename
+for file in ./*fastq.genos
+do
+   mv "$file" "${file%.fastq.genos}".genos
+done
+
+#below is the script to run the omysex script
+
+SGE_Batch -q harold -r omysex -c 'perl /dfs/FW_HMSC/Omalley_Lab/dayan/software/GTseq-Pipeline/OmySEX_test_v3.pl'
+
+# don't forget to remove these dups when done
+
+
+```
+
 
 
