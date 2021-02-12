@@ -6,4 +6,6 @@
 
 <b>O. tshawytscha:  </b> 
 
+(1) Ots_335_probe_seqs.txt: Temporary best probe sequence. Needs confirmation as the most up to date panel (it has ~10 fewer markers than the CRITFC panel) 
+
 <b>O. kisutch  </b> 
