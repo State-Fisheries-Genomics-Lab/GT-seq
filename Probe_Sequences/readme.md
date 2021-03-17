@@ -6,6 +6,8 @@
 
 <b>O. tshawytscha:  </b> 
 
-(1) Ots_335_probe_seqs.txt: Temporary best probe sequence. Needs confirmation as the most up to date panel (it has ~10 fewer markers than the CRITFC panel) 
+(1) Ots_335_probe_seqs.csv: Current Ots probe sequence, but includes a duplicate  
+(2) **Ots_334_probe_seqs_removed_Ots37124-12279142.csv:** Use this one! Includes most recent Ots28 markers, but excludes a duplicate marker identified by WDFW  
+(3) Ots_335_probe_seqs.txt: Does not include latest Ots28 markers
 
 <b>O. kisutch  </b> 
