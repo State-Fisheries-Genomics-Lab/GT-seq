@@ -660,23 +660,27 @@ The script below will pull the allele count ratios and read counts for all indiv
 #run from directory with your .genos
 
 #collect marker info from all the genos files
-touch marker_info.txt
+touch marker_info.csv
+echo 'ind,marker,a1_count,a2_count,called_geno,a1_corr,a2_corr' >> marker_info.csv
 for file in ./*genos
 do
-    awk ' FS="," {print FILENAME,$1,$2,$3,$6,$7,$8}' $file >> marker_info.txt
+    awk -F"," ' BEGIN { OFS="," } {print FILENAME,$1,$2,$3,$6,$7,$8}' $file >> marker_info.csv
 done
 
-# now we'll clean up this file a little bit, you can do this in a text editor or the console
-# added headers (ind, marker, a1_count, a2_count, called_geno, a1_corr, a2_corr)
-# make sure the file is tab delimited
+# now we'll cleanup this file a little bit
+sed -i '/Raw-Reads/d' ./marker_info.csv #first get rid of genos headers
+
+# now clean up the "ind" field so that it matches your data
+# depending on the file naming convention you used for your individuals this may need to change, for the example script we removed the leading "./" and the trailing lane information and file extension (e.g. "_L002_R1_001.genos"), but there's no way to standardize this step unless we standardize naming conventions all the way back to the library prep logs
 
 ```
 
-Read in the marker info file.
+Read in the marker info file and clean it up.
 ```{r, message=FALSE, warning=FALSE}
 
-marker_info <- read_tsv("example_data/genotype_data/marker_info.txt")
-#this part changes the values of A=2, G=898, etc for the allele count columns to the actual values
+marker_info <- read_csv("example_data/genotype_data/marker_info.csv")
+
+#this part changes the values of A=2, G=898, -=52, etc for the allele count columns to the actual values
 marker_info$a1_count <- as.numeric(substr(marker_info$a1_count, 3, nchar(marker_info$a1_count)))
 marker_info$a2_count <- as.numeric(substr(marker_info$a2_count, 3, nchar(marker_info$a2_count)))
 
@@ -910,9 +914,10 @@ Below we show plots for one representative good marker, and two representative b
 
 # this is an example code chunk don't run it in your own pipeline
 
-marker_info <- read_tsv("example_data/genotype_data/marker_info.txt")
-marker_info$a1_count <- as.numeric(marker_info$a1_count)
-marker_info$a2_count <- as.numeric(marker_info$a2_count)
+marker_info <- read_csv("example_data/genotype_data/marker_info.csv")
+marker_info$a1_count <- as.numeric(substr(marker_info$a1_count, 3, nchar(marker_info$a1_count)))
+marker_info$a2_count <- as.numeric(substr(marker_info$a2_count, 3, nchar(marker_info$a2_count)))
+
 
 
 ggplot(data=marker_info[marker_info$marker=="OMS00008",])+geom_point(aes(a1_count, a2_count, color = called_geno), alpha = 0.7, size =2)+theme_classic()+geom_abline(aes(slope=1, intercept=0))+geom_abline(aes(slope = 10, intercept=0), color = "green")+geom_abline(aes(slope = 0.1, intercept=0), color = "red")+geom_abline(aes(slope = 0.2, intercept=0), color = "blue")+geom_abline(aes(slope = 5, intercept=0), color = "blue")+coord_equal(ratio=1)+geom_abline(slope = -1, intercept = 10)+xlim(c(0,150))+ylim(c(0,150))+ggtitle("Good Marker")
