@@ -18,6 +18,7 @@ require(graph4lg)
 require(related)
 require(adegenet)
 require(knitr)
+require(magrittr)
 ```
 
 
@@ -123,7 +124,7 @@ __QAQC Check:__
 - Remove controls and replicates if all looks good  
 
 __Filtering:__  
-The final filtering cutoffs are below:  
+Filtering operates in multiple stages. The final filtering cutoffs are below:  
 
 - IFI_cutoff = 2.5  (remove individuals with low confidence)  
 - GTperc_cutoff=90 (exclude individuals with greater than 10% missing data)  
@@ -141,12 +142,23 @@ A few optional code chunks also use the terminal on a unix based machine (i.e. a
 
 Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see the commands and more  details about a step. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. There are also full scripts submitted as jobs to the server. These need to be saved as a file and submitted with the appropriate command from the server scheduler such as qsub or SGE_Batch.
 
-Copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol. See the code chunk below on how to do this.
+
+## Local R Setup  
+
+The easiest way to both get the scripts you will need locally and grab all the example data you will need to run the example script is to clone the entire GTseq-SOP repository onto your local machine. __ALWAYS MAKE SURE YOU CLONE THE MOST RECENT VERSION OF THE REPOSITORY BEFORE RUNNING A NEW ANALYSIS__ See the code chunk below on how to do this.
+
+Note also that to run the GTseq example script using the example data, use the data found at example_data/ in the repository (you don't need to transfer the data off the server). It will has been cleaned up and modified to reflect the most current sequencing approach we use and will run smoothly, details are in the relevant sections of the SOP below.
+
+Alternatively, copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol.
+
+Make sure you load the required libraries (first code chunk in this notebook). 
 
 ```{bash, eval = FALSE}
 # Local
 
 # note: this is optional and only needed if you want to follow along with the example code on your own machine
+
+#you can also skip the command line version of the git clone process and instead click the clone link under the "code" button on the repository home page.
 
 # move to your working directory 
 # create a directory for this repository and move inside
@@ -254,11 +266,11 @@ Results from mapping studies.  [Link here](https://github.com/State-Fisheries-Ge
 
 # Example Script  
 
-Here is an example script of a full genotyping pipeline from raw reads to fully filtered SNP dataset.
+Here is an example script of a full genotyping pipeline from raw reads to fully filtered SNP dataset. 
 
 ## Data Summary
 
-The example dataset uses fall run and half-pounder steelhead from the Rogue River. 
+The example dataset uses fall run and half-pounder steelhead from the Rogue River. Note that the data on the server can be used to run the full pipeline, but yo can also skip the server side analysis (genotype calling) and run just the local side analysis (filtering and data visualization) using the example data provided. 
 
 __Sample Summary__
 
@@ -266,24 +278,7 @@ Let's gather all the metadata and summarize:
 ```{r, message=FALSE, warning=FALSE}
 # LOCAL R
 
-#intake files
-half_2019_intake <- readxl::read_xlsx("example_data/metadata/STHP Intake form Spread sheet 2019.xlsx", sheet = 1)
-fall_intake <- readxl::read_xlsx("example_data/metadata/Rogue Adult Summer and Winter (06 11 20).xlsx", sheet = 1)
-
-#merge intakes
-# first clean them up a bit to make merging easier
-half_2019_intake <- half_2019_intake[,c(1,2)]
-half_2019_intake$run <- "halfpounder"
-half_2019_intake$year <- "2019"
-colnames(half_2019_intake) <- c("ID", "Date", "run", "year")
-
-fall_intake <- subset(fall_intake, Run == "Summer")
-fall_intake <- fall_intake[,c(1,3,6)]
-colnames(fall_intake) <- c("ID", "Date", "run")
-fall_intake$run <- "fall"
-fall_intake$year <- "2019"
-
-meta_data <- bind_rows( half_2019_intake, fall_intake)
+meta_data <- read_tsv("example_data/metadata/example_meta_data.txt")
 
 kable(meta_data %>%
   group_by(run, year) %>%
@@ -292,42 +287,32 @@ kable(meta_data %>%
 
 __Sequencing Data Summary__
 
-Data came demultiplexed from sequencing center. Location in code chunk below
+Data came already demultiplexed from sequencing center. Location in code chunk below
 
 ```{bash, eval = FALSE}
 # SERVER
 
-/dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux - 2019 fall and 2019 halfpounder
+/dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs # 150 fastqs, 
 ```
 
+__Raw Quality Report for Full Lane__
 Clusters: 409,149,535  
 Yield (mbase): 61,782  
 % >Q30 bases: 87.13  
 Average Qual: 37.18  
 
-Ran fastqc report (not included in SOP)
+Run fastqc report (not included in SOP) to get a look at this kind of information
 
 
 ## Demultiplex
 
-The first step is to demultiplex the raw sequencing file using the i5 and i7 indexes. We can actually skip this because the sequencing center already performed a demux. Instead, we just copy the demuxed files and give them more reasonable name.  
+The first step is to demultiplex the raw sequencing file using the i5 and i7 indexes. We can actually skip this step in the example script because the sequencing center already performed a demux. Instead, just copy the demuxed files to a working directory.  
 
 ```{bash, eval=FALSE}
 # SERVER
 
-#first move the demuxed files over
-cp /nfs2/hts/illumina/200723_J00107_0245_AHHLG2BBXY_1504/L23/*Omy* /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux
-
-cp /nfs2/hts/illumina/200723_J00107_0245_AHHLG2BBXY_1504/L23/*positive* /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux
-
-cp /nfs2/hts/illumina/200723_J00107_0245_AHHLG2BBXY_1504/L23/negative* /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux
-
-#next rename to something easier to work with, this command takes the last 20 characters and tosses the rest
-
-for file in ./*
-do
-   mv "$file" "${file:20}"
-done
+#example script to copy the data to your own directory
+SGE_Batch -c "cp /dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs/*fastq /path/to/your/fastq/directory" -q harold -r copy
 ```
 
 
@@ -380,18 +365,19 @@ Next we'll run the GTseq genotyper (v3.1) script on each fastq file to generate 
 
 We need to run this script for each demultiplexed fastq. To speed this up we'll use an array job. The code chunk below contains an example array job script. To run the job, you'll save the script on the server and run it using the _qsub_ command.  
 
-The genotyper script requires unzipped fastq files for input. First code chunk below can decompress the input if your demultiplexed files are compressed
+The genotyper script requires unzipped fastq files for input. The first code chunk below can decompress the input if your demultiplexed files are compressed (example files do not need to be decompressed). The second code chunk contains the genotyper script.
 
 ```{bash, eval = FALSE}
-##### decompress script
+# SERVER
 
 # note 1: this is a script to save and submit as a job, save everything below the long ########### below
+
 #note 2: the number of threads to use (-t option) is hardcoded to match the number of input files, change this number to reflect how many fastq.gz files you have
 
-#################################
+################################# save everything below this as a file
 #!/bin/bash
 #$ -S /bin/bash
-#$ -t 1-554
+#$ -t 1-150
 #$ -tc 20
 #$ -N decompress
 #$ -cwd
@@ -408,10 +394,18 @@ gunzip -c $INFILE > ${INFILE%.gz}
 ```
 
 ```{bash, eval=FALSE}
+#SERVER 
+# Genotyper Script
+
+# note 1: this is a script to save and submit as a job, save everything below the long ########### below
+
+#note 2: the number of threads to use (-t option) is hardcoded to match the number of input files, change this number to reflect how many fastq files you have in the directory
+
+################################# save everything below this as a file
 #!/bin/bash
 #$ -S /bin/bash
 
-#$ -t 1-554
+#$ -t 1-153
 
 #$ -tc 20
 
@@ -422,26 +416,27 @@ gunzip -c $INFILE > ${INFILE%.gz}
 #$ -o $JOB_NAME_$TASK_ID.out
 
 #$ -e $JOB_NAME_$TASK_ID.err
-export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/'
+export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/' #you may want to change this to your own perl lib destination 
 
-FASTQS=(`ls /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux/*fastq`)
+FASTQS=(`ls /dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs/*fastq`)
 INFILE=${FASTQS[$SGE_TASK_ID -1]}
 OUTFILE=$(basename ${INFILE%.fastq}.genos)
 
-GTSEQ_GENO="/dfs/FW_HMSC/Omalley_Lab/dayan/software/GTseq-Pipeline/GTseq_Genotyper_v3.1.pl
-"
+GTSEQ_GENO="/dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/GTseq_Genotyper_v3.1.pl" #again, change this path to your own copy of this script
 
-PROBE_SEQS="/dfs/FW_HMSC/Omalley_Lab/dayan/software/GTseq-Pipeline/Omy_GTseq390_ProbeSeqs.csv"
+PROBE_SEQS="/dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/Omy_GTseq390_ProbeSeqs.csv" #change the probe seq file to match whatever panel you are using
 
 perl $GTSEQ_GENO $PROBE_SEQS $INFILE > $OUTFILE
 
-#save this code chunk as a file on the server and submit this with qsub -q harold scriptname from the directory you want the output .genos files
+#save this code chunk as a file on the server and submit this with the following command from the directory you want the output .genos files:
+# qsub -q harold scriptname 
+# note that you might submit to a different -q than harold
 ```
 
 Some notes about this script:  
 __-t :__ this is the total number of task id to use. this script will iterate over this list. so if you have 100 individuals to genotype set this to 1-100.   
-__-tc:__ this is the throttle. the value used in the script above (20), means we will submit the 554 separate commands in batches of 20 until it is done  
-__submitting__: I usually store all of the scripts I will submit to the server in a directory named "sge," so if I wanted to submit this script (named gtseq_geno.txt) i'd submit the command qsub -q harold path/to/my/scripts/sge/gtseq_geno.txt  . you can check the progress with the qstat command.
+__-tc:__ this is the throttle. the value used in the script above (20), means we will submit the 554 separate commands in batches of 20 until it is done. you should check that this many nodes are available in the submit queue (use SGE_Avail)   
+__submitting__: I usually store all of the scripts I will submit to the server in a directory named "sge," so if I wanted to submit this script (named gtseq_geno.txt) to thte otter queue, I'd submit the command qsub -q otter path/to/my/scripts/sge/gtseq_geno.txt  . you can check the progress with the qstat command.
 
 __Sex Genotyper__
 
@@ -452,29 +447,20 @@ After the genotypes are written for the panel, we add the sex genotyper.
 # notes
 
 # the omysex script (and otssex) is hardcoded to require the fastqs and genos to all be in a single collective directory, for fastqs to be decompressed, and for it to be run from this directory
-# rather than try to fix this hardcoding in the script, a shortcut is to copy all the fastqs into the directory with your .genos from the previous step then deleted them after to conserve space
+# rather than try to fix this hardcoding in the script, a shortcut is to move all the fastqs into the directory with your .genos from the previous step then move them back after to conserve space
 # another hardcoded part of the omysex script involves how it parses sample names all fastqs must be samplename.fastq and all genos must be samplename.genos
 
-
-
 ##### copy decompressed fastqs to directory with your .genos
-cp /dfs/FW_HMSC/Omalley_Lab/dayan/half_pounder/genotyping/demux/*fastq ./
 
-##### rename
-#note: in previous SOP version an error caused output genos files to have the extension "fastq.genos", this fixes that error, but should be deprecated in the current version
-# leaving it here in case it crops up again
-
-for file in ./*fastq.genos
-do
-   mv "$file" "${file%.fastq.genos}".genos
-done
+#from the directory with the .genos files
+mv /dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs/*fastq ./
 
 ##### sex genotyper
-#below is the command to run the omysex script
+#below is the command to run the omysex script, note that it is wrapped into and SGE_Batch command, you can also use an interactive node (e.g. qrsh), but don't run this on the login node
 
-SGE_Batch -q harold -r omysex -c 'perl /dfs/FW_HMSC/Omalley_Lab/dayan/software/GTseq-Pipeline/OmySEX_test_v3.pl'
+SGE_Batch -q harold -r omysex -c 'perl /dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/OmySEX_test_v3.pl'
 
-##### don't forget to remove these dups when done
+##### don't forget to move these files back when done
 
 
 ```
@@ -484,15 +470,16 @@ __Compile Genotypes__
 After all the .genos are written, we compile them into a single output using the GenoCompile script
 
 ```{bash, eval=FALSE}
+#SERVER
 
-#this is run from within the .genos directory
-SGE_Batch -q harold -r compile -c 'perl /dfs/FW_HMSC/Omalley_Lab/dayan/software/GTseq-Pipeline/GTseq_GenoCompile_v3.pl > ../genotypes/half_pounder_GTs_0.1.csv'
+#this is run from the directory with your .genos files
+SGE_Batch -q harold -r compile -c 'perl /dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/GTseq_GenoCompile_v3.pl > example_GTs_0.1.csv' 
 
 ```
 
 Congratulations, you've run the pipeline! Now we will need to do quality control and filtering.
 
-At this point in the suggested protocol, you should run the SummaryFigures script from the GTseq pipeline. However, this script contains harcoded values for genotype calling that are different from the actual genotyping script and will misrepresent the data. Do not run it. We will produce the same figures in the next section.
+At this point in the suggested published protocol, you should run the SummaryFigures script from the GTseq pipeline. However, this script contains harcoded values for genotype calling that are different from the actual genotyping script and will misrepresent the data. __Do not run it__, it will mislead you. We will produce the same figures in the next section.
 
 ## QAQC
 
@@ -504,37 +491,49 @@ First let's check that the controls worked well. We will check that negative con
 ```{r, warning=FALSE, message=FALSE}
 # LOCAL R
 
-# first I cleaned up the sample names in the output compiled genotype file (.csv) with regex in a text editor - separated adapter info from sample name etc, you may not need to do this depending on who did your demultiplexing
+# First we are going to prep the raw genotype data for filtering.
 
-# then read this file in to R
+# read the raw genotypes file in to R
 genos_0.1 <- read_csv("example_data/genotype_data/example_GTs_0.1.csv")
 
-# lets set a value to mark controls
-# here controls contained "positive," "negative" in their sample names so used simple pattern matching to create a new column
+# add a field to mark controls
+# here controls contained "positive," "negative" in their sample names so used simple pattern matching to create a new column, you can add you own here for known controls (e.g. known winter run steelhead)
+genos_0.1 %<>%
+  mutate(control = case_when(str_detect(Sample, "positive") ~ "positive",
+                             str_detect(Sample, "negative") ~ "negative",
+                             TRUE ~ "sample"))
 
-genos_0.1 <- genos_0.1 %>%
-  mutate(control = ifelse(grepl("positive", Sample), "positive", ifelse(grepl("negative", Sample), "negative", "sample")))
+# clean up sample name field
+# split the sample name and the adapter sequence (note that replicates will have the same sample name, but we'll keep track with the adapter sequences)
 
-# great let's plot
-ggplot()+geom_histogram(data = genos_0.1, aes(x = `On-Target Reads`, fill= control)) + theme_classic()
+genos_0.1 %<>%
+  mutate(adapter = str_extract(Sample, "[ATCG]{6}-[ATCG]{6}")) %>%
+  mutate(sample_simple = str_extract(Sample, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}")) %>%
+  relocate(Sample, sample_simple, adapter)
+
+# great, prep is done, now lets make our first plot: distribution of reads between controls and samples
+ggplot()+geom_histogram(data = genos_0.1, aes(x = `On-Target Reads`, fill= control)) + theme_classic()+scale_fill_viridis_d()
 
 
 ```
 
-Looks good. Negative controls have very few reads, positive are distributed, but lets just double check that there isn't a negative control  with a lot of reads hiding in there and indicating a plate flip:
+Looks good (somewhat). Negative controls have very few reads, positive are mostly in the center of the read distribution, (some have zero, but they just went bad...). Let's also double check that there isn't a negative control with a lot of reads hiding in there (this becomes possible when there are thousands of samples) and indicating a plate flip :
 
 ```{r, message=FALSE, warning=FALSE}
+#LOCAL R
+
 ggplot()+geom_histogram(data = genos_0.1[genos_0.1$control=="negative",], aes(x = `On-Target Reads`)) + theme_classic()
 
 ```
 
-Uh-oh, a negative control with ~6300 on target reads, but maybe there's just a lot of reads at this adapter/well, lets examine as a portion of total reads, and also the portion GT'd.
+Looks great, but let's also examine as a portion of total reads, sometimes a negative can have a lot of reads from contamination, but they should all be off target.
 
 ```{r, warning=FALSE}
-ggplot()+geom_histogram(data = genos_0.1, aes(x = `%On-Target`, fill= control)) + theme_classic()
+#LOCAL R
+ggplot()+geom_histogram(data = genos_0.1, aes(x = `%On-Target`, fill= control)) + theme_classic()+scale_fill_viridis_d()
 ```
 
-Okay, that looks a lot better. The negative control with a lot of reads only has very small amount on target, much lower than most samples and positive controls. This suggests it is unlikely to be due to a wetlab error like flipping a plate upside down. Positive and negative controls check out. Also of note here is that the positive controls are biased down with respect to on target proportion, suggesting these samples are getting old. 
+Looks good (except for those aging positive controls)
 
 
 ### Replicates
@@ -547,18 +546,22 @@ Some samples were replicated, let's check for concordance in the genotypes, the 
 # here we filter out our known controls and create our next dataset genos_0.11
 genos_0.11 <- genos_0.1 %>%
   filter(control == "sample") %>%
-  filter(Sample != "Winter") %>%
-  filter(Sample != "Heterozygous") %>%
-  filter(Sample != "Summer")
+  select(-control) #get rid of this column
+
+# sometimes we'll use more than a single replicate, this broke a previous version of this code chunk, for now we'll find the triplicate (or more) samples, and keep the two with greatest on target read depth (ignoring triplicates quadruplicates etc)
+ 
+genos_0.11 %<>% 
+  group_by(sample_simple) %>%
+  slice_max(order_by = `On-Target Reads`, n = 2)
 
 #now let's get duplicated samples
-dups <- genos_0.11[genos_0.11$Sample %in% genos_0.11$Sample[duplicated(genos_0.11$Sample)],]
-dups <- dups[order(dups$Sample),]
+dups <- genos_0.11[genos_0.11$sample_simple %in% genos_0.11$sample_simple[duplicated(genos_0.11$sample_simple)],]
+dups <- dups[order(dups$sample_simple),]
 
 # next we'll calculate the percent concordance among replicates
 # woof I don't see a good way around using a nested for loop here, maybe fix this in the future
 
-dups_genos <- dups[,8:ncol(dups)] #caution, possible hardcoding here, grab genotpyes and leave metadata out
+dups_genos <- dups[,9:ncol(dups)] 
 rep_info <- matrix(ncol=ncol(dups_genos), nrow=nrow(dups_genos)/2)
 colnames(rep_info) <- colnames(dups_genos)
 for (j in 1:(nrow(dups_genos)/2)) {
@@ -570,16 +573,18 @@ for (i in 1:ncol(dups_genos)) {
 geno_concordance <- as.data.frame(as.matrix(rep_info)) %>%
   rowMeans()
 
-rep_data <- as.data.frame(cbind(dups[c(1:length(geno_concordance))*2,2], geno_concordance))
+rep_data <- as.data.frame(cbind(dups[c(1:length(geno_concordance))*2,1], geno_concordance))
 ggplot(data=rep_data)+geom_histogram(aes(x=geno_concordance))+theme_classic()
 
 ```
 
-There are ~50 replicated samples. Mean concordance of genotype across replicates is 87.3%. Next let's examine whats going on with the samples with very low concordance.
+There are ~4 replicated samples in the example data. Mean concordance is high, but there's some variance there to explore. Next let's examine whats going on with the paur of samples with lower concordance.
 
 ```{r}
+#LOCAL R
+
 #get the bad samples
-bad_reps <- genos_0.11[genos_0.11$Sample %in% rep_data[rep_data$geno_concordance<0.50,1],1:7]
+bad_reps <- genos_0.11[genos_0.11$Sample %in% rep_data[rep_data$geno_concordance<0.7,1],1:8]
 bad_reps[order(bad_reps$Sample),]
 ```
 
@@ -590,12 +595,11 @@ Replicate samples look good, bad replicates (<50% concordance) seems to be due t
 
 Next let's make the 0.2 dataset (i.e. remove the replicates with lower GT success).
 ```{r}
-
 # LOCAL R
 
 #this writes a new dataset (0.2) by choosing the samples within duplicates and keeping the one with the highest genotyping success
 genos_0.2 <- genos_0.11 %>%
-  group_by(Sample) %>%
+  group_by(sample_simple) %>%
   filter(`On-Target Reads` == max(`On-Target Reads`))
 
 ```
@@ -642,10 +646,12 @@ First we filter individuals and loci on IFI, and missingness.
 
 Let's take a look at the distribution of these values before any filtering
 ```{r, message=FALSE, warning=FALSE}
+#LOCAL R
+
 ggplot(genos_0.2)+geom_histogram(aes(x=IFI))+geom_vline(aes(xintercept= 2.5), color="red")+theme_classic()
 ggplot(genos_0.2)+geom_histogram(aes(x=`%GT`))+geom_vline(aes(xintercept= 90), color="red")+theme_classic()
 
-missingness <- (colSums(genos_0.2[,c(8:(ncol(genos_0.2)-1))] == "00" | genos_0.2[,c(8:(ncol(genos_0.2)-1))] == "0"))/nrow(genos_0.2) #warning hardcoding: "[,8:398]" is hardcoded to work on the example script using the Omy panel with 390 markers, these values will need to be changed to reflect the genotype columns of the genos r object that YOU are running. This excludes columns with metadata and genotyping results such as "sample name" "ifi" "on-target reads" etc
+missingness <- (colSums(genos_0.2[,c(9:ncol(genos_0.2))] == "00" | genos_0.2[,c(8:(ncol(genos_0.2)-1))] == "0"))/nrow(genos_0.2) #warning hardcoding: "[,8:398]" is hardcoded to work on the example script using the Omy panel with 390 markers, these values will need to be changed to reflect the genotype columns of the genos r object that YOU are running. This excludes columns with metadata and genotyping results such as "sample name" "ifi" "on-target reads" etc
 missing <- as.data.frame(missingness)
 missing$marker <- row.names(missing)
 ggplot(missing) + geom_histogram(aes(x=missingness))+geom_vline(aes(xintercept= 0.2), color="red")+geom_vline(aes(xintercept= 0.1), color="blue")+theme_classic()+xlab("missingness (loci)")
@@ -657,7 +663,7 @@ The script below will pull the allele count ratios and read counts for all indiv
 ```{bash, eval = FALSE}
 # SERVER
 
-#run from directory with your .genos
+#run from directory with your .genos (use a SSGE_Batch job or interactive shell)
 
 #collect marker info from all the genos files
 touch marker_info.csv
@@ -667,22 +673,26 @@ do
     awk -F"," ' BEGIN { OFS="," } {print FILENAME,$1,$2,$3,$6,$7,$8}' $file >> marker_info.csv
 done
 
-# now we'll cleanup this file a little bit
+# now we'll cleanup this file so that it is easier to work with
 sed -i '/Raw-Reads/d' ./marker_info.csv #first get rid of genos headers
+sed -i '/negative/d' ./marker_info.csv # then get rid of controls
+sed -i '/positive/d' ./marker_info.csv # then get rid of controls
 
-# now clean up the "ind" field so that it matches your data
-# depending on the file naming convention you used for your individuals this may need to change, for the example script we removed the leading "./" and the trailing lane information and file extension (e.g. "_L002_R1_001.genos"), but there's no way to standardize this step unless we standardize naming conventions all the way back to the library prep logs
 
 ```
 
-Read in the marker info file and clean it up.
+Read in the marker info file and clean it up a little more. Note you'll have to transfer the file off the server for this.
 ```{r, message=FALSE, warning=FALSE}
+#LOCAL R
 
 marker_info <- read_csv("example_data/genotype_data/marker_info.csv")
 
-#this part changes the values of A=2, G=898, -=52, etc for the allele count columns to the actual values
-marker_info$a1_count <- as.numeric(substr(marker_info$a1_count, 3, nchar(marker_info$a1_count)))
-marker_info$a2_count <- as.numeric(substr(marker_info$a2_count, 3, nchar(marker_info$a2_count)))
+#this part changes the values of A=2, G=898, -=52, etc for the allele count columns to the actual values, and gets rid of some mess in the sample names (ind)
+marker_info %<>%
+  mutate(a1_count =  as.numeric(substr(a1_count, 3, nchar(a1_count)))) %>%
+  mutate(a2_count =  as.numeric(substr(a2_count, 3, nchar(a2_count)))) %>%
+  mutate(ind = str_remove(ind, "^\\./")) %>%
+  mutate(ind = str_remove(ind, "\\.genos"))
 
 
 ```
@@ -696,7 +706,7 @@ First remove the individuals and markers that clearly failed to genotype correct
 #print table of bad missingness individual
 kable(genos_0.2 %>%
   filter(`%GT` < 70) %>%
-    select(2:7), caption = "Individuals with high missingess (>30% missing data)")
+    select(2,4,5,6,7), caption = "Individuals with high missingess (>30% missing data)")
 
 # now remove them
 genos_0.3 <- genos_0.2 %>%
@@ -704,7 +714,7 @@ genos_0.3 <- genos_0.2 %>%
 
 #now recalculate locus level missingness after removing the worst individuals
   
-missingness2 <- (colSums(genos_0.3[,c(8:(ncol(genos_0.3)-1))] == "00" | genos_0.3[,c(8:(ncol(genos_0.3)-1))] == "0"))/nrow(genos_0.3) #warning hardcoding: "c(8:(ncol(genos_0.3)-1))" is hardcoded to work on the example script. make sure this this only grabbing the columns that contian genotype data and not other columns (last column should be sample type, first 7 columns should have individual level summary data ) e.g. IFI
+missingness2 <- (colSums(genos_0.3[,c(9:(ncol(genos_0.3)))] == "00" | genos_0.3[,c(9:(ncol(genos_0.3)))] == "0"))/nrow(genos_0.3) 
 missing2 <- as.data.frame(missingness2)
 missing2$marker <- row.names(missing2)
 
@@ -739,14 +749,14 @@ IFI <- marker_info %>%
 # the "marker_info" file we produced earlier used the filename of the genos file as the sample name (column name "ind"), but the sample names in our local R dataframes are very cleaned up (see line 504). Here I attempt to do the same using some regex in R using the standardized codes for sample naming at SFGL, but note that depending on how your fastq files are named, these exact matches may not work for you
 # until we find a better solution I suggest two alternatives if this regex below breaks
 # 1: if the number of high IFI samples is very low, just write the sample names out manually to a vector and use this to filter
-# 2: 
+# 2:
 
 IFI$sample <- str_extract(IFI$ind, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}")
-IFI$adapter <- str_replace(IFI$ind, "(\\w+)[-_]([:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}).*", "\\1")
+IFI$adapter <- str_extract(IFI$ind, "[ATCG]{6}-[ATCG]{6}") 
 
 
 genos_0.3 <- genos_0.3 %>%
-  left_join(select(IFI, sample, adapter, ifi2), by = c("Sample" = "sample", "Adapter" = "adapter")) %>%
+  left_join(select(IFI, sample, adapter, ifi2), by = c("sample_simple" = "sample", "adapter" = "adapter")) %>%
   mutate(IFI = ifi2) %>%
   select(-one_of("ifi2"))
 
@@ -763,9 +773,9 @@ genos_0.3 <- genos_0.3 %>%
 ```
 
 __Filtering log 0.2 -> 0.3:__  
-0 inds removed with IFI > 10  
-3 inds removed with genotying success less than 70%  
+1 samples removed with genotying success less than 70%  
 3 loci removed with > 50% missingness  
+0 samples with high IFI
 
 __0.4 Second Iteration Filter__
 
@@ -779,7 +789,7 @@ Next we do the same process, but at the final filtering levels:
 #print table of bad missingness individual
 kable(genos_0.3 %>%
   filter(`%GT` < 90) %>%
-    select(2:7), caption = "Individuals with high missingess (>10% missing data)")
+    select(2,4,5,6,7,8), caption = "Individuals with high missingess (>10% missing data)")
 
 # now remove them
 genos_0.4 <- genos_0.3 %>%
@@ -787,7 +797,7 @@ genos_0.4 <- genos_0.3 %>%
 
 #now recalculate locus level missingness after removing the worst individuals
   
-missingness3 <- (colSums(genos_0.4[,c(8:(ncol(genos_0.4)-1))] == "00" | genos_0.4[,c(8:(ncol(genos_0.4)-1))] == "0"))/nrow(genos_0.4) #warning hardcoding: "c(8:(ncol(genos_0.3)-1))" is hardcoded to work on the example script. make sure this this only grabbing the columns that contian genotype data and not other columns (last column should be sample type, first 7 columns should have individual level summary data ) e.g. IFI
+missingness3 <- (colSums(genos_0.4[,c(9:(ncol(genos_0.4)))] == "00" | genos_0.4[,c(9:(ncol(genos_0.4)))] == "0"))/nrow(genos_0.4) 
 missing3 <- as.data.frame(missingness3)
 missing3$marker <- row.names(missing3)
 
@@ -824,11 +834,11 @@ IFI <- marker_info %>%
 # 2: 
 
 IFI$sample <- str_extract(IFI$ind, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}")
-IFI$adapter <- str_replace(IFI$ind, "(\\w+)[-_]([:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}).*", "\\1")
+IFI$adapter <- str_extract(IFI$ind, "[ATCG]{6}-[ATCG]{6}") 
 
 
 genos_0.4 <- genos_0.4 %>%
-  left_join(select(IFI, sample, adapter, ifi2), by = c("Sample" = "sample", "Adapter" = "adapter")) %>%
+  left_join(select(IFI, sample, adapter, ifi2), by = c("sample_simple" = "sample", "adapter" = "adapter")) %>%
   mutate(IFI = ifi2) %>%
   select(-one_of("ifi2"))
 
@@ -849,8 +859,8 @@ Note that the table above is blank in the example script because 0 individuals s
 __0.3 -> 0.4 Filtering Log__
 
 Filtered out:  
-15 individuals with <90% genotying success (i.e. greater than 10% missing data)  
-9 markers with > 20% missingness  
+4 individuals with <90% genotying success (i.e. greater than 10% missing data)  
+10 markers with > 20% missingness  
 0 contaminated samples (note here that all the samples with high IFI are already removed by the individual level missingness step in the example data)
 
 
@@ -914,17 +924,17 @@ Below we show plots for one representative good marker, and two representative b
 
 # this is an example code chunk don't run it in your own pipeline
 
-marker_info <- read_csv("example_data/genotype_data/marker_info.csv")
-marker_info$a1_count <- as.numeric(substr(marker_info$a1_count, 3, nchar(marker_info$a1_count)))
-marker_info$a2_count <- as.numeric(substr(marker_info$a2_count, 3, nchar(marker_info$a2_count)))
+marker_info2 <- read_csv("example_data/genotype_data/marker_info_original.csv")
+marker_info2$a1_count <- as.numeric(substr(marker_info2$a1_count, 3, nchar(marker_info2$a1_count)))
+marker_info2$a2_count <- as.numeric(substr(marker_info2$a2_count, 3, nchar(marker_info2$a2_count)))
 
 
 
-ggplot(data=marker_info[marker_info$marker=="OMS00008",])+geom_point(aes(a1_count, a2_count, color = called_geno), alpha = 0.7, size =2)+theme_classic()+geom_abline(aes(slope=1, intercept=0))+geom_abline(aes(slope = 10, intercept=0), color = "green")+geom_abline(aes(slope = 0.1, intercept=0), color = "red")+geom_abline(aes(slope = 0.2, intercept=0), color = "blue")+geom_abline(aes(slope = 5, intercept=0), color = "blue")+coord_equal(ratio=1)+geom_abline(slope = -1, intercept = 10)+xlim(c(0,150))+ylim(c(0,150))+ggtitle("Good Marker")
+ggplot(data=marker_info2[marker_info2$marker=="OMS00008",])+geom_point(aes(a1_count, a2_count, color = called_geno), alpha = 0.7, size =2)+theme_classic()+geom_abline(aes(slope=1, intercept=0))+geom_abline(aes(slope = 10, intercept=0), color = "green")+geom_abline(aes(slope = 0.1, intercept=0), color = "red")+geom_abline(aes(slope = 0.2, intercept=0), color = "blue")+geom_abline(aes(slope = 5, intercept=0), color = "blue")+coord_equal(ratio=1)+geom_abline(slope = -1, intercept = 10)+xlim(c(0,150))+ylim(c(0,150))+ggtitle("Good Marker")
 
-ggplot(data=marker_info[marker_info$marker=="Omy_RAD46672-27",])+geom_point(aes(a1_count, a2_count, color = called_geno), alpha = 0.7, size =2)+theme_classic()+geom_abline(aes(slope=1, intercept=0))+geom_abline(aes(slope = 10, intercept=0), color = "green")+geom_abline(aes(slope = 0.1, intercept=0), color = "red")+geom_abline(aes(slope = 0.2, intercept=0), color = "blue")+geom_abline(aes(slope = 5, intercept=0), color = "blue")+coord_equal(ratio=1)+geom_abline(slope = -1, intercept = 10)+xlim(c(0,150))+ylim(c(0,150))+ggtitle("Bad Marker, A2 Bias")
+ggplot(data=marker_info2[marker_info2$marker=="Omy_RAD46672-27",])+geom_point(aes(a1_count, a2_count, color = called_geno), alpha = 0.7, size =2)+theme_classic()+geom_abline(aes(slope=1, intercept=0))+geom_abline(aes(slope = 10, intercept=0), color = "green")+geom_abline(aes(slope = 0.1, intercept=0), color = "red")+geom_abline(aes(slope = 0.2, intercept=0), color = "blue")+geom_abline(aes(slope = 5, intercept=0), color = "blue")+coord_equal(ratio=1)+geom_abline(slope = -1, intercept = 10)+xlim(c(0,150))+ylim(c(0,150))+ggtitle("Bad Marker, A2 Bias")
 
-ggplot(data=marker_info[marker_info$marker=="Omy_RAD52458-17",])+geom_point(aes(a1_count, a2_count, color = called_geno), alpha = 0.7, size =2)+theme_classic()+geom_abline(aes(slope=1, intercept=0))+geom_abline(aes(slope = 10, intercept=0), color = "green")+geom_abline(aes(slope = 0.1, intercept=0), color = "red")+geom_abline(aes(slope = 0.2, intercept=0), color = "blue")+geom_abline(aes(slope = 5, intercept=0), color = "blue")+coord_equal(ratio=1)+geom_abline(slope = -1, intercept = 10)+xlim(c(0,150))+ylim(c(0,150))+ggtitle("Bad Marker\nA1 bias in a subset of samples")
+ggplot(data=marker_info2[marker_info2$marker=="Omy_RAD52458-17",])+geom_point(aes(a1_count, a2_count, color = called_geno), alpha = 0.7, size =2)+theme_classic()+geom_abline(aes(slope=1, intercept=0))+geom_abline(aes(slope = 10, intercept=0), color = "green")+geom_abline(aes(slope = 0.1, intercept=0), color = "red")+geom_abline(aes(slope = 0.2, intercept=0), color = "blue")+geom_abline(aes(slope = 5, intercept=0), color = "blue")+coord_equal(ratio=1)+geom_abline(slope = -1, intercept = 10)+xlim(c(0,150))+ylim(c(0,150))+ggtitle("Bad Marker\nA1 bias in a subset of samples")
 
 ```
 
@@ -981,26 +991,25 @@ genos_1.0 <- genos_0.5 %>%
 
 __Duplicate Samples__
 
-Some sample tissues are provided in batches of fin clips. Let's make sure no fin clips broke apart leading to a single individual to be represented twice in the dataset. Rather than fussing with installing coancestry for windows on a unix system, estimated relatedness using an R package (related) which can implement the code from Coancestry. 
+Some sample tissues are provided in batches of fin clips. Let's make sure no fin clips broke apart leading to a single individual to be represented twice in the dataset. Rather than fussing with installing coancestry for windows on a unix system, estimated relatedness using an R package (related) which can implement the code from Coancestry on any operating system. 
 
-To run the code in Coancestry on a windows machine, use the GUI.
+Alternatively, to run the code in Coancestry on a windows machine, use the GUI.
 
 We used the estimator from Lynch and Ritland 1999 #not dyadic likelihood estimator, Milligan (2003) 
 ```{r, eval=FALSE}
 # Local R
 
-# The input file needs a unique row for each indiviudal and two columns for each diploid locus
-# threw out metadata and wrote to a file
-# then we split all the genotype values using regex in a text editor (after converting all na values to 00)
-# also convert indels / big probes (denoted with a "-" to missing, as related only wants SNPs)
-#   find string: \t([ATGC0XY])([ATCG0XY])  replace string: \t\1\t\2
-# convert genos to numbers and removed sex marker
-#convert to integer T-1 G->2 etc
-
-just_genos <- genos_1.0[,c(2, c(8:(ncol(genos_1.0)-1)))] #note possible hardcoding here (just like missingness), if this breakes edit the columns so that it grabs only the sample name and genotype data
+# The input file for coancestry needs a unique row for each indiviudal and two columns for each diploid locus, and alleles as integers
+# throw out metadata and sex marker and wrote to a file
+just_genos <- genos_1.0[,c(2, c(9:(ncol(genos_1.0)-1)))] #note possible hardcoding here (just like missingness), if this breaks edit the columns so that it grabs only the simple sample name and genotype data
 write_tsv(just_genos, "./example_data/genotype_data/just_genos.txt")
 
-#now do the regex
+# first remove header
+# then convert all NA fields to "00"
+# then convert all "-" (used for indels and complex probes) to 5
+# then split all the genotype values using regex in a text editor 
+# here's an example regex for this changes: find string: \t([ATGC05])([ATCG05])  replace string: \t\1\t\2
+#convert alleles to integer T-1 G->2 etc, for indels / big probes (denoted with a "-") already converted to "5"
 
 # now run coancestry
 #rmat <- coancestry("./genotype_data/just_genos.txt", dyadml = 1)
@@ -1087,7 +1096,7 @@ Here's adegenet's genind object
 genos_2.1 <- genos_2.0
 colnames(genos_2.1) <- gsub("\\.", "_", colnames(genos_2.1))
 #convert to matrix with inds as row names
-genos_2.1 <- as.matrix(genos_2.1[,c(8:362)]) #caution hardcoding, make sure you select just your marker columns
+genos_2.1 <- as.matrix(genos_2.1[,c(9:ncol(genos_2.1))]) #caution hardcoding, make sure you select just your marker columns
 row.names(genos_2.1) <- genos_2.0$Sample
 genind_1.0 <- df2genind(genos_2.1, sep ="", ploidy=2,NA.char = "0")
 
