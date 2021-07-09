@@ -9,6 +9,10 @@ output:
     toc_collapsed: false
 ---
 
+
+
+# Readme
+
 ```{r, message=FALSE, warning=FALSE}
 require(tidyverse)
 require(DiagrammeR)
@@ -21,13 +25,10 @@ require(knitr)
 require(magrittr)
 ```
 
-
-# Readme
-
 This is document is an R notebook. If you'd like view to pre-rendered figures, read a summary of analysis and interact with code, please open the relevant html file in a browser. 
 
 
-To conduct a similar analyses on your computer, edit or run code: clone this repository into a directory on you r local machine and open the .Rproj file in Rstudio. 
+To conduct a similar analyses on your computer, edit or run code: clone this repository into a directory on your local machine and open the .Rproj file in Rstudio.
 
 # Rationale 
 
@@ -36,8 +37,8 @@ Genotyping-in-Thousands by sequencing (GT-seq) is a cost effective method develo
 This document:   
 (a) outlines the bioinformatic procedures for processing raw GT-seq reads to a fully filtered SNP dataset according to the standards adopted by the State Fisheries Genomics Lab at Oregon State University  
 (b) shares instructions for setting up the environment to run the scripts  
-(c) provides an example detailed protocol genotyping _Oncorhynchus mykiss_ samples with figures and results  
-(d) directs GT-seq users to relevant metadata to conduct their own genotyping (i.e probe sequences) 
+(c) provides an example detailed protocol genotyping _Oncorhynchus mykiss_ samples with example data, figures, and results  
+(d) directs GT-seq users to relevant metadata and scripts to conduct their own genotyping (i.e probe sequences) 
 
 # GTseq outline
 
@@ -112,15 +113,16 @@ __Sequencing QC__
 - Check that the reads look good from the sequencer with fastqc or similar program  
 
 __GT-seq Scripts__  
-- Demultiplex reads: The first step is to demultiplex sequencing data if demuxed files are not provided by sequencing center using the GTseq_Barcode_Split_MP.py script or a different demultiplexing approach such as deML  
+These steps are done on a server:  
+- Demultiplex reads: The first step is to demultiplex sequencing data if demuxed files are not provided by sequencing center using the GTseq_Barcode_Split_MP.py script or a different demultiplexing approach such as deML. Our GTseq data primarily comes demultiplexed from the sequencing center, so this step is usually skipped.   
 - Call genotypes: Use GTseq_Genotyper_v3.1.pl to call genotypes on demultiplexed reads.  
 - (Optional) Call Sex Genotypes: If species has unique script for calling the sex markers (O. mykiss and O. tshawytscha), run these as well  
 - Compile: After all the individual genotypes are called, compile them into a single output using the GTseq_GenoCompile_v3.pl script.  
 
 __QAQC Check:__  
 - Check positive and negative controls (for plate flipping, other library prep errors)  
-- Check known genotype controls if included (het winter summer controls)  
-- Check technical replicates  
+- Check known genotype controls if included (e.g. winter vs summer run steelhead controls)  
+- Check technical replicates for concordance  
 - Remove controls and replicates if all looks good  
 
 __Filtering:__  
@@ -134,24 +136,24 @@ Filtering operates in multiple stages. The final filtering cutoffs are below:
 - Remove monomorphic SNPs  
 - Remove duplicated individuals  
 
-# Environment setup and how to use
+# Environment setup and how to use this SOP
 
-This SOP is run in two environments, the OSU cluster and a local instance of R. You can open this document as a .rmd in Rstudio when processing your own data, or simply copy and paste the code found here into your own terminal.
+This SOP is run in two environments, the OSU cluster and a local instance of R. All code needed to run the SOP can be found here. You can open this document as a .rmd in Rstudio when processing your own data, or simply copy and paste the code found in the code chunks into your own script or terminal.
 
-A few optional code chunks also use the terminal on a unix based machine (i.e. a mac), but they can also run entirely on the cluster, or on a windows based machine with a little work (just run the unix based commands in a unix/bash based terminal on a windows machine like cygwin or the new bash shell available on windows 10 [install link here](https://docs.microsoft.com/en-us/windows/wsl/install-win10) ).
+A few optional code chunks also use the terminal on a unix based local machine (i.e. a mac), but they can also run entirely on the cluster, or on a windows based machine with a little work (just run the unix based commands in a unix/bash based terminal on a windows machine like cygwin or the new bash shell available on windows 10 [install link here](https://docs.microsoft.com/en-us/windows/wsl/install-win10) ).
 
-Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see the commands and more  details about a step. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. There are also full scripts submitted as jobs to the server. These need to be saved as a file and submitted with the appropriate command from the server scheduler such as qsub or SGE_Batch.
+Commands sent to the terminal appear as code chunks in this SOP and narrative is provided in the main body. Click the gray "code" box to see the commands and more details about a step. The appropriate environment for running each code chunk will appear as a comment at the head the chunk. There are also full scripts submitted as jobs to the server. These need to be saved as a file and submitted with the appropriate command from the server scheduler such as qsub or SGE_Batch. Also some scripts and commands submitted on the OSU cluster need to be wrapped into a command for submission (e.g SGE_Batch) or submitted on a interactive node. Don't run things on the login node.
 
 
 ## Local R Setup  
 
 The easiest way to both get the scripts you will need locally and grab all the example data you will need to run the example script is to clone the entire GTseq-SOP repository onto your local machine. __ALWAYS MAKE SURE YOU CLONE THE MOST RECENT VERSION OF THE REPOSITORY BEFORE RUNNING A NEW ANALYSIS__ See the code chunk below on how to do this.
 
-Note also that to run the GTseq example script using the example data, use the data found at example_data/ in the repository (you don't need to transfer the data off the server). It will has been cleaned up and modified to reflect the most current sequencing approach we use and will run smoothly, details are in the relevant sections of the SOP below.
+Note also that to run the full GTseq example script using the example data, use the data found at example_data/ in the repository (you don't need to transfer the data off the server, but it should match if you do). Details are in the relevant sections of the SOP below.
 
-Alternatively, copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol.
+Alternatively, copying the directory in [this repository](https://github.com/State-Fisheries-Genomics-Lab/GT-seq) named "example data" will provide all the relevant files to run the local portion (R) of the example protocol, without cloning the full repository.
 
-Make sure you load the required libraries (first code chunk in this notebook). 
+Make sure you load the required libraries (run [the first code chunk](#Readme) in this notebook). 
 
 ```{bash, eval = FALSE}
 # Local
@@ -177,7 +179,7 @@ Finally, paths to files and scripts in the SOP are on David Dayan's directories,
 ## OSU Cluster Setup
 
 __Scripts__  
-In order to run the GTseq, you must have a copy of the most current GTseq scripts stored on the cluster. As there are multiple versions of the scripts, it is reccomended to download them into directory on the cluster directly from the github repository, which is actively maintained.
+In order to run the GTseq, you must have a copy of the most current GTseq scripts stored on the cluster. As there are multiple versions of the scripts, it is recommended to download them into directory on the cluster directly from the github repository, which is actively maintained.
 
 _Option A:_ File transfer GUI  
 
@@ -187,7 +189,6 @@ _Option B:_ Git
 
 You can also clone whole repository onto the server with git and then move relevant files to where you want them
 ```{bash, eval = FALSE}
-
 # SERVER
 
 # clone the repository somewhere temporary
@@ -202,8 +203,8 @@ mkdir /dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/
 mv  ~/tmp/GT-seq/GT-seq_scripts/* /dfs/Omalley_Lab/dayan/software/GTseq-Pipeline/
 
 #delete your temporary repo
-bash #default shell is zcsh which requires you to confirm EVERY SINGLE file deletion
-rm -r ~/tmp/* #caution scary, be sure there's no typo here
+bash #default shell is zcsh which requires you to confirm EVERY SINGLE file deletion, run bash instead
+rm -r ~/tmp/* #caution this is scary, be sure there's no typo here
 rmdir ~/tmp
 ```
 
@@ -217,13 +218,13 @@ _Installing:_
 
 # SERVER
 
-# You have three options to install String::Approx, I confirmed the first one works, but the others may be even simpler
+# You have three options to install String::Approx, I confirmed the first one works, but the others may be simpler
 
 #### Option 1: make
 
 # first download the tarball for String Approx here ( https://metacpan.org/release/String-Approx ) into a temporary directory on the server
 
-# then, unpack the tarball and follow the instructions in the readme (below) 
+# then, unpack the tarball and follow the instructions in the readme ( copied below) 
 perl Makefile.PL
         make
         make test
@@ -239,16 +240,15 @@ install String::Approx
 
 _Setting the environment:_  
 
-Before running any scripts that require the String::Approx module, you must set the environment with the following commands. This will be noted in the example scripts but can also be found here.
+Before running any scripts that require the String::Approx module, you must set the environment with the following commands. This will be noted in the example scripts below but can also be found here.
 
 ```{bash, eval = FALSE}
 
 #SERVER
 
-setenv PERL5LIB ~/perl5/lib/perl5/x86_64-linux-thread-multi/ #for tcsh (default shell on server)
+export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/' # if using bash as your shell (all of the time for the SOP)
 
-export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/' # if using bash as your shell
-
+setenv PERL5LIB ~/perl5/lib/perl5/x86_64-linux-thread-multi/ #for tcsh (default shell on server, but all scripts that require this run in bash)
 ```
 
 # Panel Info
@@ -266,15 +266,15 @@ Results from mapping studies.  [Link here](https://github.com/State-Fisheries-Ge
 
 # Example Script  
 
-Here is an example script of a full genotyping pipeline from raw reads to fully filtered SNP dataset. 
+Here is the example script of a full genotyping pipeline from raw reads to fully filtered SNP dataset. 
 
 ## Data Summary
 
-The example dataset uses fall run and half-pounder steelhead from the Rogue River. Note that the data on the server can be used to run the full pipeline, but yo can also skip the server side analysis (genotype calling) and run just the local side analysis (filtering and data visualization) using the example data provided. 
+The example dataset uses fall run and half-pounder steelhead from the Rogue River. Note that the data on the server can be used to run the full pipeline, but you can also skip the server side analysis (genotype calling) and run just the local side analysis (filtering and data visualization) using the example data provided at the Github repository. 
 
 __Sample Summary__
 
-Let's gather all the metadata and summarize:
+Let's gather all the metadata about the physical samples and summarize:
 ```{r, message=FALSE, warning=FALSE}
 # LOCAL R
 
@@ -287,12 +287,12 @@ kable(meta_data %>%
 
 __Sequencing Data Summary__
 
-Data came already demultiplexed from sequencing center. Location in code chunk below
+Data came already demultiplexed from sequencing center. Location in code chunk below. 153 fastqs, including some controls and replicates.
 
 ```{bash, eval = FALSE}
 # SERVER
 
-/dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs # 150 fastqs, 
+/dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs # 153 fastqs, 
 ```
 
 __Raw Quality Report for Full Lane__
@@ -301,22 +301,23 @@ Yield (mbase): 61,782
 % >Q30 bases: 87.13  
 Average Qual: 37.18  
 
-Run fastqc report (not included in SOP) to get a look at this kind of information
+Run fastqc report or other look at sequence data (not included in SOP) to get a look at this kind of information before running your own genotyping.
 
 
 ## Demultiplex
 
-The first step is to demultiplex the raw sequencing file using the i5 and i7 indexes. We can actually skip this step in the example script because the sequencing center already performed a demux. Instead, just copy the demuxed files to a working directory.  
+The first step is to demultiplex the raw sequencing file using the i5 and i7 indexes. We can usually skip this step in the example script because the sequencing center already performed demultiplexing. Instead, just copy the demuxed files to a working directory.  
 
 ```{bash, eval=FALSE}
 # SERVER
 
 #example script to copy the data to your own directory
+
 SGE_Batch -c "cp /dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs/*fastq /path/to/your/fastq/directory" -q harold -r copy
 ```
 
 
-If, instead you are supplied with multiplexed fastq files (boo) you can use the GTseq scripts to demultiplex. First you need to generate a key file.
+If instead, you are supplied with multiplexed fastq files (boo) you can use the GTseq scripts to demultiplex your data. First you need to generate a key file.
 
 ```{r, eval=FALSE, message=FALSE}
 # LOCAL R
@@ -370,6 +371,8 @@ The genotyper script requires unzipped fastq files for input. The first code chu
 ```{bash, eval = FALSE}
 # SERVER
 
+# Decompression script
+
 # note 1: this is a script to save and submit as a job, save everything below the long ########### below
 
 #note 2: the number of threads to use (-t option) is hardcoded to match the number of input files, change this number to reflect how many fastq.gz files you have
@@ -377,7 +380,7 @@ The genotyper script requires unzipped fastq files for input. The first code chu
 ################################# save everything below this as a file
 #!/bin/bash
 #$ -S /bin/bash
-#$ -t 1-150
+#$ -t 1-153
 #$ -tc 20
 #$ -N decompress
 #$ -cwd
@@ -394,7 +397,8 @@ gunzip -c $INFILE > ${INFILE%.gz}
 ```
 
 ```{bash, eval=FALSE}
-#SERVER 
+# SERVER 
+
 # Genotyper Script
 
 # note 1: this is a script to save and submit as a job, save everything below the long ########### below
@@ -418,7 +422,7 @@ gunzip -c $INFILE > ${INFILE%.gz}
 #$ -e $JOB_NAME_$TASK_ID.err
 export PERL5LIB='/home/fw/dayand/perl5/lib/perl5/x86_64-linux-thread-multi/' #you may want to change this to your own perl lib destination 
 
-FASTQS=(`ls /dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs/*fastq`)
+FASTQS=(`ls /dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs/*fastq`) #reminder to change the directory to your copy of the fastqs
 INFILE=${FASTQS[$SGE_TASK_ID -1]}
 OUTFILE=$(basename ${INFILE%.fastq}.genos)
 
@@ -434,9 +438,9 @@ perl $GTSEQ_GENO $PROBE_SEQS $INFILE > $OUTFILE
 ```
 
 Some notes about this script:  
-__-t :__ this is the total number of task id to use. this script will iterate over this list. so if you have 100 individuals to genotype set this to 1-100.   
-__-tc:__ this is the throttle. the value used in the script above (20), means we will submit the 554 separate commands in batches of 20 until it is done. you should check that this many nodes are available in the submit queue (use SGE_Avail)   
-__submitting__: I usually store all of the scripts I will submit to the server in a directory named "sge," so if I wanted to submit this script (named gtseq_geno.txt) to thte otter queue, I'd submit the command qsub -q otter path/to/my/scripts/sge/gtseq_geno.txt  . you can check the progress with the qstat command.
+__-t :__ this is the total number of task id to use. this script will iterate over this list. so if you have 100 fastq files to genotype set this to 1-100.   
+__-tc:__ this is the throttle. the value used in the script above (20), means we will submit the 153 separate commands in batches of 20 until it is done. you should check that this many nodes are available in the submit queue (use SGE_Avail)   
+__submitting__: I usually store all of the scripts I will submit to the server in a directory named "sge," so if I wanted to submit this script (named gtseq_geno.txt) to the otter queue, I'd submit the command qsub -q otter path/to/my/scripts/sge/gtseq_geno.txt  . you can check the progress with the qstat command.
 
 __Sex Genotyper__
 
@@ -448,9 +452,9 @@ After the genotypes are written for the panel, we add the sex genotyper.
 
 # the omysex script (and otssex) is hardcoded to require the fastqs and genos to all be in a single collective directory, for fastqs to be decompressed, and for it to be run from this directory
 # rather than try to fix this hardcoding in the script, a shortcut is to move all the fastqs into the directory with your .genos from the previous step then move them back after to conserve space
-# another hardcoded part of the omysex script involves how it parses sample names all fastqs must be samplename.fastq and all genos must be samplename.genos
+# another hardcoded part of the omysex script involves how it parses sample names. all fastqs must be samplename.fastq and all genos must be samplename.genos
 
-##### copy decompressed fastqs to directory with your .genos
+##### move decompressed fastqs to directory with your .genos
 
 #from the directory with the .genos files
 mv /dfs/Omalley_Lab/dayan/gtseq_sop/raw_fastqs/*fastq ./
@@ -479,11 +483,15 @@ SGE_Batch -q harold -r compile -c 'perl /dfs/Omalley_Lab/dayan/software/GTseq-Pi
 
 Congratulations, you've run the pipeline! Now we will need to do quality control and filtering.
 
-At this point in the suggested published protocol, you should run the SummaryFigures script from the GTseq pipeline. However, this script contains harcoded values for genotype calling that are different from the actual genotyping script and will misrepresent the data. __Do not run it__, it will mislead you. We will produce the same figures in the next section.
+At this point in the suggested published protocol, you would run the SummaryFigures script from the GTseq pipeline. However, this script contains harcoded values for genotype calling that are different from the actual genotyping script and will misrepresent the data. __Do not run it__, it will mislead you. We will produce similar figures in the next section.
+
+At this point you can move the file "example_GTs_0.1.csv" onto your local machine to conduct filtering. 
 
 ## QAQC
 
 Here we do some basic quality control. We check positive (known good DNA) and negative (known blank samples) controls, as well as control for known genotypes (i.e. known winter run, etc). After controls, we check for concordance among sample replicates to check that no wetlab errors occured that might have scrambled indexing/barcoding. 
+
+If you just want to run the protocol from this point forward the outputs from the server steps are available in the /example_data directory of this repository.
 
 ### Controls
 
@@ -991,7 +999,7 @@ genos_1.0 <- genos_0.5 %>%
 
 __Duplicate Samples__
 
-Some sample tissues are provided in batches of fin clips. Let's make sure no fin clips broke apart leading to a single individual to be represented twice in the dataset. Rather than fussing with installing coancestry for windows on a unix system, estimated relatedness using an R package (related) which can implement the code from Coancestry on any operating system. 
+Some sample tissues are provided in batches of fin clips introducing the possibility for unknown duplicates in the sample. Let's make sure no fin clips broke apart leading to a single individual to be represented twice in the dataset. __You may not want to run this if you are confident your samples do not contain duplicates__ Rather than fussing with installing coancestry for windows on a unix system, estimated relatedness using an R package (related) which can implement the code from Coancestry on any operating system. 
 
 Alternatively, to run the code in Coancestry on a windows machine, use the GUI.
 
