@@ -11,5 +11,6 @@
 (2) **Ots_334_probe_seqs_removed_Ots37124-12279142.csv:** Use this one! Includes most recent Ots28 markers, but excludes a duplicate marker identified by WDFW  
 (3) Ots_335_probe_seqs.txt: Does not include latest Ots28 markers
 
-<b>O. kisutch  </b> 
-test new file
+<b>O. kisutch  </b>  
+
+(1) Oke_GTseq350_ProbeSeqs.csv: Full Oke probe sequence file
