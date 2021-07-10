@@ -637,17 +637,6 @@ Then examine for paralogues among markers with
 - Markers with high variance in ratio of allele counts at heteroyzgotes and "in-betweeners"
 - Remove monomorphic SNPs  
 
-__File readme__  
-A key to different outputs in the filtering pipeline: 
-XXXXXXXXXXx this needs updating ingore for now XXXXXXXXx   
-0.1: Raw, unfiltered GTs including all controls and replicates  
-0.2: Raw, unfiltered GTs, replicates and controls removed  
-0.3: filtered for IFI, GTperc (inds), and Missingness (loci) > 20%  
-0.4: filtered for IFI, GTperc (inds), and Missingness (loci) > 20%, and allele correction issues  
-1.0: 0.4 + removed monomorphic  
-2.0: 1.0 + duplicate sample removal  
-2.2:  final genotype dataset with metadata (population, run, sample date)  
-
 #### IFI and Missingness
 
 First we filter individuals and loci on IFI, and missingness. 
@@ -1104,15 +1093,19 @@ Here's adegenet's genind object
 genos_2.1 <- genos_2.0
 colnames(genos_2.1) <- gsub("\\.", "_", colnames(genos_2.1))
 #convert to matrix with inds as row names
-genos_2.1 <- as.matrix(genos_2.1[,c(9:ncol(genos_2.1))]) #caution hardcoding, make sure you select just your marker columns
-row.names(genos_2.1) <- genos_2.0$Sample
+genos_2.1 <- as.matrix(genos_2.1[,c(9:(ncol(genos_2.1)-1))]) #caution potential hardcoding to exclude sex marker, get rid of the "-1" if you don't have a sex marker
+row.names(genos_2.1) <- genos_2.0$sample_simple
 genind_1.0 <- df2genind(genos_2.1, sep ="", ploidy=2,NA.char = "0")
 
 #add in the populations
 genos_2.2 <- genos_2.0 %>%
-  left_join(meta_data, by=c("Sample" = "ID"))
+  left_join(meta_data, by=c("sample_simple" = "ID")) %>%
+  select(-c(Sample, adapter)) %>% # dont need this anymore
+  rename(sample = sample_simple) %>% #rename this column
+  relocate(sample, Date, year, run) # reorder the columns, this may be different depending on the metadata columns you added
 
-genind_1.0@pop <- as.factor(genos_2.2$run)
+
+genind_1.0@pop <- as.factor(genos_2.2$run) # this might change depending on metadata, for example if yo wanted to name by the column "pop" in your metadata table, change to as.factor(genos_2.2$pop) 
 
 ```
 
@@ -1130,8 +1123,8 @@ Finally, save your files as R objects for further analysis.
 
 # here we save a few objects with useful info
 genind_2.0 <- genind_1.0
-save(genos_2.2, file ="./genotype_data/genotypes_2.2.R")
-save(genind_2.0, file= "./genotype_data/genind_2.0.R")
+save(genos_2.2, file ="example_data/genotype_data/genotypes_2.2.R")
+save(genind_2.0, file= "example_data/genotype_data/genind_2.0.R")
 ```
 
 
