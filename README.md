@@ -3,7 +3,7 @@ Standard Operating Procedure, Scripts, and data for GT-seq Genotyping
 
 Repository Contents:
 
-<b>(1) Example Protocol:</b> Full genotyping pipeline from raw sequence reads to fully filtered SNP dataset in multiple formats. Download and open GT-seq_SOP.html in a browser  
+<b>(1) Example Protocol:</b> Full genotyping pipeline from raw sequence reads to fully filtered SNP dataset in multiple formats. Download and open GT-seq_SOP.html in a browser to view. To run for yourself the easiest path is to clone this full repository to your local machine.  
 <b>(2) Example Data:</b> data to run the example protocol/SOP  
 <b>(3) Probe Sequences</b> Data needed to run pipeline    
 <b>(4) GT-seq Scripts:</b> Updated repository of GTseq pipeline scripts  
