@@ -7,9 +7,13 @@
 
 <b>O. tshawytscha:  </b> 
 
-(1) Ots_335_probe_seqs.csv: Current Ots probe sequence, but includes a duplicate  
-(2) **Ots_334_probe_seqs_removed_Ots37124-12279142.csv:** Use this one! Includes most recent Ots28 markers, but excludes a duplicate marker identified by WDFW  
-(3) Ots_335_probe_seqs.txt: Does not include latest Ots28 markers
+(1) Ots356_probeseqs.csv: This is the updated probe sequence file for that works with 75bp sequencing (referred to as OtsGTseqV6.1 at CRITFC). It includes 351 markers from CRITFC as well 5 "RoSA" markers.
+(2) Ots_335_probe_seqs.csv: must up to date version of the non-75bp compliant Ots probe sequence, but includes a duplicate  
+(3) Ots_334_probe_seqs_removed_Ots37124-12279142.csv: Includes most recent Ots28 markers, but excludes a duplicate marker identified by WDFW  
+(4) Ots_335_probe_seqs.txt: Does not include latest Ots28 markers
+(5) **Ots352: USE THIS ONE** david's best guess as to what is actually in the panel (exclude read hogs, add back the excluded rosa marker (note that I included the reverse primer as FWD primer and changed the SNP codes and probes to their reverse complements), include "miscellaneous plate")
+
+**Note that still nedd to confirm all of this with Cristin and that Ots351b isn't defined**
 
 <b>O. kisutch  </b>  
 

@@ -493,6 +493,50 @@ Here we do some basic quality control. We check positive (known good DNA) and ne
 
 If you just want to run the protocol from this point forward the outputs from the server steps are available in the /example_data directory of this repository.
 
+### Marker Info
+
+The first step in the QA-QC process is to collect some information about genotying success from the .genos files. We'll do this with an awk one liner.  
+
+The script below will pull the allele count ratios and read counts for all individuals in the pipeline
+```{bash, eval = FALSE}
+# SERVER
+
+#run from directory with your .genos (use a SSGE_Batch job or interactive shell)
+
+#collect marker info from all the genos files
+bash
+touch marker_info.csv
+echo 'ind,marker,a1_count,a2_count,called_geno,a1_corr,a2_corr' >> marker_info.csv
+for file in ./*genos
+do
+    awk -F"," ' BEGIN { OFS="," } {print FILENAME,$1,$2,$3,$6,$7,$8}' $file >> marker_info.csv
+done
+
+# now we'll cleanup this file so that it is easier to work with
+sed -i '/Raw-Reads/d' ./marker_info.csv #first get rid of genos headers
+sed -i '/negative/d' ./marker_info.csv # then get rid of controls
+sed -i '/positive/d' ./marker_info.csv # then get rid of controls
+
+
+```
+
+Read in the marker info file and clean it up a little more. Note you'll have to transfer the file off the server for this.
+```{r, message=FALSE, warning=FALSE}
+#LOCAL R
+
+marker_info <- read_csv("example_data/genotype_data/marker_info.csv")
+
+#this part changes the values of A=2, G=898, -=52, etc for the allele count columns to the actual values, and gets rid of some mess in the sample names (ind)
+marker_info %<>%
+  mutate(a1_count =  as.numeric(substr(a1_count, 3, nchar(a1_count)))) %>%
+  mutate(a2_count =  as.numeric(substr(a2_count, 3, nchar(a2_count)))) %>%
+  mutate(ind = str_remove(ind, "^\\./")) %>%
+  mutate(ind = str_remove(ind, "\\.genos"))
+
+
+```
+
+
 ### Controls
 
 First let's check that the controls worked well. We will check that negative controls have much fewer reads than average (there may be some on-target reads from othr samples due to index sequence error)
@@ -612,6 +656,109 @@ genos_0.2 <- genos_0.11 %>%
 
 ```
 
+### Sex Ratios
+
+__If you are using the OmySEX and OtsSEX scripts to call sex genotypes, read this section. If else, skip it, and move on to filtering.__
+
+The OmySEX and OtsSEX scripts rely on hardcoded estimates of the proportion of reads dedicated to the sex marker to call sex genotypes. This can sometimes go awry if the sex marker does not amplify as expected during the library prep (e.g. primers are aging, proportion of primers in the primer pool is off, etc). 
+
+In this portion of the SOP we will check if the sex genotyping script worked well, and if not, apply a correction.
+
+#### Sex Script Check
+
+First, let's check if the script worked correctly.
+
+```{r}
+#LOCAL R
+
+# Plot sex marker counts
+
+sex_marker_info <- marker_info %>%
+  filter(str_detect(marker, "SEXY")) %>%
+  mutate(called_geno = replace_na(called_geno, "00")) %>%
+  mutate(called_geno = case_when(called_geno == "A1HOM" ~ "XX",
+                                 called_geno == "HET" ~ "XY",
+                                 called_geno == "00" ~ "00"))
+  
+ggplot(data = sex_marker_info)+geom_point(aes(a2_count, a1_count, color = called_geno))+scale_colour_viridis_d(name = "Called Sex Genotype")+theme_classic()+xlab("Y-specific probe count")+ylab("Theoretical X chromosome count")+geom_abline(aes(intercept = 0, slope = 0.1))+geom_abline(aes(intercept = 0, slope = 5))+geom_abline(aes(intercept = 0, slope = 10))+geom_abline(aes(intercept = 0, slope = 0.2))+xlim(0,max(c(sex_marker_info$a1_count, sex_marker_info$a2_count)))+ylim(0,max(c(sex_marker_info$a1_count, sex_marker_info$a2_count)))+geom_abline(aes(intercept = 0, slope = 1), color = "darkred")
+
+kable(sex_marker_info %>% count(called_geno), caption = "Called Sex Ratio")
+```
+
+In the example data presented above _(if you're running this script on your own data this will look different so disregard)_, we can see that there are two very clear clusters of data: one with very few Y-counts (green cluster) and a second that includes both uncalled (00) and male genotypes (purple and yellow cluster). This second cluster should follow a 1:1 ratio between Y-specific probe count and Theoretical X chromosome count (i.e. the dark red line in the plot), but we see here that it does not. Something has gone wrong. There are too many Theoretical X chromosome counts. This could be caused by the Y-specific primers in the pool going bad, or too small of an amount mixed into the primer pool. In any case it looks like males are being undercalled.
+
+If your data looks good (clear clusters, males follow the 1:1 line, and very few uncalled sex genotypes), then move on to filtering. If your data looks bad, let's do some correction.
+
+#### Sex Genotype Correction
+
+Here, instead of relying on a harcoded value for the proportion of reads dedicated to the sex marker, we will attempt to estimate this value from the empirical data, and use this estimate to re-call sex genotypes.
+
+```{r}
+#LOCAL R
+
+# First let's collect the number of on-target reads for each sample in the sex_marker_info dataframe
+sex_marker_info$sample <- str_extract(sex_marker_info$ind, "[:upper:][:lower:]{2}[AJCU][RC]\\d{2}\\w{4}_\\d{4}")
+sex_marker_info$adapter <- str_extract(sex_marker_info$ind, "[ATCG]{6}-[ATCG]{6}") 
+
+sex_marker_info %<>%
+  left_join(dplyr::select(genos_0.1, sample_simple, adapter, `On-Target Reads`), by = c("sample" = "sample_simple" , "adapter" = "adapter"))
+
+# now here's the tricky part. we're going to do a first pass filter to eliminate any samples that coldn't possibly be males, then estimate the theoretical number of X chromosome counts for possible males
+#first get the estimate
+Xmale_proportion_error <- sex_marker_info %>%
+  filter(a2_count > 1) %>% #this value is set to 1 if the actual count is zero in the omysexscript, so here we're are eliminating all individuals where it woulbe extremely unlikely that they are males 
+  summarise(Xmale_proportion = mean(a2_count/`On-Target Reads`))
+
+#then use the estimate to correct the data
+sex_marker_info %<>%
+  mutate(XY_count_estimate = Xmale_proportion_error[[1]]*`On-Target Reads`) %>%
+  mutate(corrected_ratio = XY_count_estimate/a2_count) %>%
+  mutate(corrected_sex_genotype = case_when(corrected_ratio > 10 ~ "XX",
+                                            corrected_ratio <= 0.1 ~ "XY",
+                                            corrected_ratio <= 0.2 ~ "00",
+                                            corrected_ratio <= 5 ~ "XY",
+                                            TRUE ~ "00"
+                                            )) #note these ratios are taken directly from the omysex script but this seems like another bug, shouldn't XY < 0.2 be NA not XY???
+
+```
+
+Now we'll plot again and see if this correction worked as expected.
+
+```{r}
+#LOCAL R
+
+ggplot(data = sex_marker_info)+geom_point(aes(a2_count, XY_count_estimate, color = corrected_sex_genotype), alpha = 0.7)+scale_colour_viridis_d(name = "Corrected Called\nSex Genotype")+theme_classic()+xlab("Y-specific probe count")+ylab("Corrected Theoretical X chromosome count")+geom_abline(aes(intercept = 0, slope = 0.1))+geom_abline(aes(intercept = 0, slope = 5))+geom_abline(aes(intercept = 0, slope = 10))+geom_abline(aes(intercept = 0, slope = 0.2))+xlim(0,max(c(sex_marker_info$XY_count_estimate, sex_marker_info$a2_count)))+ylim(0,max(c(sex_marker_info$XY_count_estimate, sex_marker_info$a2_count)))+geom_abline(aes(intercept = 0, slope = 1), color = "darkred")
+
+kable(sex_marker_info %>% 
+        group_by(corrected_sex_genotype) %>%
+        summarise(count = n(), mean_depth = mean(`On-Target Reads`)), caption = "Corrected Called Sex Ratio")
+
+```
+
+In the example data, this correction looks like it worked: Called males follow a 1:1 line and there are very few uncalled sex genotypes, except for samples with very low total on-target reads. Also the overall sex ratio of this sample is closer to our a priori expectations.
+
+Finally let's correct the sex genotypes in the data.
+
+```{r}
+#LOCAL R
+
+# run this command for Omy
+genos_0.2 %<>%
+  left_join(select(sex_marker_info, sample, adapter, corrected_sex_genotype), by = c("sample_simple"="sample", "adapter"="adapter")) %>%
+  mutate(OmyY1_2SEXY = corrected_sex_genotype) %>%
+  select(-corrected_sex_genotype)
+```
+
+```{r, eval = FALSE}
+#LOCAL R
+
+# run this command for Ots
+genos_0.2 %<>%
+  left_join(select(sex_marker_info, sample, adapter, corrected_sex_genotype), by = c("sample_simple"="sample", "adapter"="adapter")) %>%
+  mutate(`Ots_SEXY3-1` = corrected_sex_genotype) %>%
+  select(-corrected_sex_genotype)
+```
+
 
 ### Filtering
 
@@ -652,46 +799,6 @@ missingness <- (colSums(genos_0.2[,c(9:ncol(genos_0.2))] == "00" | genos_0.2[,c(
 missing <- as.data.frame(missingness)
 missing$marker <- row.names(missing)
 ggplot(missing) + geom_histogram(aes(x=missingness))+geom_vline(aes(xintercept= 0.2), color="red")+geom_vline(aes(xintercept= 0.1), color="blue")+theme_classic()+xlab("missingness (loci)")
-```
-
-Now let's make the datasets. The first step is to collect some information about genotying success from the .genos files. We'll do this with an awk one liner.  
-
-The script below will pull the allele count ratios and read counts for all individuals in the pipeline
-```{bash, eval = FALSE}
-# SERVER
-
-#run from directory with your .genos (use a SSGE_Batch job or interactive shell)
-
-#collect marker info from all the genos files
-touch marker_info.csv
-echo 'ind,marker,a1_count,a2_count,called_geno,a1_corr,a2_corr' >> marker_info.csv
-for file in ./*genos
-do
-    awk -F"," ' BEGIN { OFS="," } {print FILENAME,$1,$2,$3,$6,$7,$8}' $file >> marker_info.csv
-done
-
-# now we'll cleanup this file so that it is easier to work with
-sed -i '/Raw-Reads/d' ./marker_info.csv #first get rid of genos headers
-sed -i '/negative/d' ./marker_info.csv # then get rid of controls
-sed -i '/positive/d' ./marker_info.csv # then get rid of controls
-
-
-```
-
-Read in the marker info file and clean it up a little more. Note you'll have to transfer the file off the server for this.
-```{r, message=FALSE, warning=FALSE}
-#LOCAL R
-
-marker_info <- read_csv("example_data/genotype_data/marker_info.csv")
-
-#this part changes the values of A=2, G=898, -=52, etc for the allele count columns to the actual values, and gets rid of some mess in the sample names (ind)
-marker_info %<>%
-  mutate(a1_count =  as.numeric(substr(a1_count, 3, nchar(a1_count)))) %>%
-  mutate(a2_count =  as.numeric(substr(a2_count, 3, nchar(a2_count)))) %>%
-  mutate(ind = str_remove(ind, "^\\./")) %>%
-  mutate(ind = str_remove(ind, "\\.genos"))
-
-
 ```
 
 
@@ -1064,17 +1171,23 @@ ggplot(genos_2.0)+geom_density(aes(x=`%On-Target`))+geom_vline(aes(xintercept=me
 Depths
 ```{r, warning=FALSE, message=FALSE}
 #LOCAL R
-
-#code to estimate depth at filtered loci
 marker_info %>%
   filter(marker %in% colnames(genos_2.0)) %>%
+  filter(ind %in% genos_2.0$Sample) %>%
   mutate(sumdepth=a1_count+a2_count) %>%
   summarise(mean=mean(sumdepth, na.rm = TRUE), median=median(sumdepth, na.rm = TRUE), sd=sd(sumdepth, na.rm = TRUE))
 
 marker_info %>%
   filter(marker %in% colnames(genos_2.0)) %>%
+  filter(ind %in% genos_2.0$Sample) %>%
   mutate(sumdepth=a1_count+a2_count) %>%
   ggplot + aes(x=sumdepth)+geom_histogram()+theme_classic()+xlab("Mean Depth Per Locus Per Individual")
+
+marker_info %>%
+  filter(marker %in% colnames(genos_2.0)) %>%
+  filter(ind %in% genos_2.0$Sample) %>%
+  mutate(sumdepth=a1_count+a2_count) %>%
+  ggplot + aes(x=sumdepth)+geom_histogram()+theme_classic()+xlab("Mean Depth Per Locus Per Individual")+xlim(0,1000)+ggtitle("inset of plot above from 0 to 1000 reads")
 ```
 
 ### Conversion
