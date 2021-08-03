@@ -504,6 +504,7 @@ The script below will pull the allele count ratios and read counts for all indiv
 #run from directory with your .genos (use a SSGE_Batch job or interactive shell)
 
 #collect marker info from all the genos files
+bash
 touch marker_info.csv
 echo 'ind,marker,a1_count,a2_count,called_geno,a1_corr,a2_corr' >> marker_info.csv
 for file in ./*genos
@@ -754,7 +755,7 @@ genos_0.2 %<>%
 # run this command for Ots
 genos_0.2 %<>%
   left_join(select(sex_marker_info, sample, adapter, corrected_sex_genotype), by = c("sample_simple"="sample", "adapter"="adapter")) %>%
-  mutate(Ots_SEXY3-1 = corrected_sex_genotype) %>%
+  mutate(`Ots_SEXY3-1` = corrected_sex_genotype) %>%
   select(-corrected_sex_genotype)
 ```
 
@@ -1170,17 +1171,23 @@ ggplot(genos_2.0)+geom_density(aes(x=`%On-Target`))+geom_vline(aes(xintercept=me
 Depths
 ```{r, warning=FALSE, message=FALSE}
 #LOCAL R
-
-#code to estimate depth at filtered loci
 marker_info %>%
   filter(marker %in% colnames(genos_2.0)) %>%
+  filter(ind %in% genos_2.0$Sample) %>%
   mutate(sumdepth=a1_count+a2_count) %>%
   summarise(mean=mean(sumdepth, na.rm = TRUE), median=median(sumdepth, na.rm = TRUE), sd=sd(sumdepth, na.rm = TRUE))
 
 marker_info %>%
   filter(marker %in% colnames(genos_2.0)) %>%
+  filter(ind %in% genos_2.0$Sample) %>%
   mutate(sumdepth=a1_count+a2_count) %>%
   ggplot + aes(x=sumdepth)+geom_histogram()+theme_classic()+xlab("Mean Depth Per Locus Per Individual")
+
+marker_info %>%
+  filter(marker %in% colnames(genos_2.0)) %>%
+  filter(ind %in% genos_2.0$Sample) %>%
+  mutate(sumdepth=a1_count+a2_count) %>%
+  ggplot + aes(x=sumdepth)+geom_histogram()+theme_classic()+xlab("Mean Depth Per Locus Per Individual")+xlim(0,1000)+ggtitle("inset of plot above from 0 to 1000 reads")
 ```
 
 ### Conversion
