@@ -9,3 +9,5 @@ Repository Contents:
 <b>(4) GT-seq Scripts:</b> Updated repository of GTseq pipeline scripts  
 <b>(5) Panel Info:</b> Information about markers such as primer sequences, source, annotation etc  
 <b>(6) Panel Mapping:</b> Results from mapping GTseq marker amplicons against reference genomes
+<b>(7) Primer Pools:</b> Different pools of primers are sometimes used across runs and are indicated in illumina run summary documents. These list the markers used in the pools.
+
