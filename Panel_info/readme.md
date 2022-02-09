@@ -9,3 +9,4 @@ __(6) Run timing markers ... :__ A roughly written narrative of variation at the
 __(7) Ots Loci Information....1Feb2021.xlsx :__ panel information for the Feb2021 75bp Ots Panel, called OtsGTseqV6.1 at CRITFC  
 __(8) Albacore_gtseq_panel_1.0.xlsx:__ First trial albacore GTseq panel info
 __(9) Rosa Primer Sequences.xlsx:__ Additional Ots28 marker information for SWFSC RoSA markers
+__(10) Albacore_gtseq_panel_289.xlsx:__ Albacore GTseq panel info for panel after Campbell optimization __USE THIS ONE__
