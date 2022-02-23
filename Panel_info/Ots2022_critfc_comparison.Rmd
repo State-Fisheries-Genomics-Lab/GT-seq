@@ -1,0 +1,95 @@
+---
+title: "2022 CRITFC Panel Updates"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+    toc: true
+    toc_float: true
+    toc_collapsed: false
+---
+
+```{r, message=FALSE, warning=FALSE}
+require(tidyverse)
+require(magrittr)
+require(knitr)
+```
+
+
+We received some updated panel information from CRITFC on February 17th. In this notebook I review the changes from our current panels.
+
+# Chinook Panel
+
+## Add/Subtract Markers
+
+What markers were added or dropped from the three panels in question (Feb 2021 CRITC, December 2021 CRITFC, Ots353 (current SFGL panel))?
+
+### CRITFC Feb 21 -> Dec 21
+First let's compare the CRITFC December 2021 panel (update) to the February 2021 panel.
+```{r}
+critfc_dec21 <- readxl::read_xlsx("Ots Loci Information. BPA. IDT. PROBEseq 20Dec2021.xlsx", sheet = 2)
+critfc_feb21 <- readxl::read_xlsx("Ots Loci Information. BPA. IDT. PROBEseq 1Feb2021.xlsx", sheet = 2)
+
+# check which markers ore in the active panel
+critfc_dec21 %<>%
+  filter(`Last Action` %in% c( "Active Panel", "Testing"))
+critfc_feb21 %<>%
+  filter(`Last Action` %in% c( "Active Panel", "Testing"))
+
+#markers in dec not in feb
+kable(filter(critfc_dec21, !(Assay %in% critfc_feb21$Assay)) %>%
+  select(Assay, `Presumed Type`), caption = "New Markers in December Panel")
+
+# markers removed
+kable(filter(critfc_feb21, !(Assay %in% critfc_dec21$Assay)) %>%
+  select(Assay, `Last Action`), caption = "Removed Markers")
+  
+```
+
+These don't add up, Feb CRITFC panel lost 4 markers, and gained three, but the total number is the same???  
+
+Okay it's because the marker names under column "assay" aren't consistent. Marker Ots_ZR-575 gets renamed as "Ots_sept9-78" in December  
+
+So the changes from February to December are as follows
+
+- add 3 AAM markers  
+- remove 3 adaptive test markers
+
+### SFGL Current Panel
+
+How does this compare to our current panel? Do we have the Feb2021 Dec2021 or something else?
+
+
+```{r, message=FALSE}
+Ots353 <- read_csv("../Probe_Sequences/Ots353_probeseqs.csv", col_names = FALSE)
+
+Ots353 %<>%
+  rename(marker=X1)
+
+kable(Ots353 %>%
+  filter(!(marker %in% critfc_dec21$Assay)) %>%
+  select(marker), caption = "Markers in Ots353 not in Dec21 CRITFC")
+
+
+kable(critfc_dec21 %>%
+  filter(!(Assay %in% Ots353$marker)) %>%
+  select(Assay), caption = "Markers in Dec21 CRITFC, not in Ots353")
+
+```
+
+__CRITFC missing__  
+Our panel has 9 markers that CRITFC doesnt have (note ZR-575 IS in the CRITFC panel under a different name). These are the three test markers they removed in their latest round, plus our SWFSC RoSA markers (stat wtih Ots37124)
+
+__SFGL missing__  
+Our panel is missing 7 markers that are in the newest CRITFC panel (note sex marker in table above because of the way I pulled these down).   
+4 are markers we excluded during our optimization because they were read hogs or had primer-dimer issues.  
+3 are the new AAM markers.
+
+# Future Work Here
+
+Things to do if/when we want to look into it more
+
+- did they make any primer or probe sequence changes?  
+- allele correction value changes?  
+- other things???  
+- same analysis for Omy panel
