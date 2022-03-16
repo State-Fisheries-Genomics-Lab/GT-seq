@@ -11,7 +11,7 @@
 (2) Ots_335_probe_seqs.csv: must up to date version of the non-75bp compliant Ots probe sequence, but includes a duplicate  
 (3) Ots_334_probe_seqs_removed_Ots37124-12279142.csv: Includes most recent Ots28 markers, but excludes a duplicate marker identified by WDFW  
 (4) Ots_335_probe_seqs.txt: Does not include latest Ots28 markers  
-(5) **Ots352: USE THIS ONE** david's best guess as to what is actually in the panel (exclude read hogs, add back the excluded rosa marker (note that I included the reverse primer as FWD primer and changed the SNP codes and probes to their reverse complements), include "miscellaneous plate")
+(5) **Ots352: USE THIS ONE** david's best guess as to what is actually in the panel (exclude read hogs, add back the excluded rosa marker (note that I included the reverse primer as FWD primer and changed the SNP codes and probes to their reverse complements), include "miscellaneous plate")  
 
 <b>O. kisutch  </b>  
 

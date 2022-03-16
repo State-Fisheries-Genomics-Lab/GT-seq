@@ -2943,7 +2943,7 @@ kable(filter(critfc_feb21, !(Assay %in% critfc_dec21$Assay)) %&gt;%
 </tbody>
 </table>
 <p>These don’t add up, Feb CRITFC panel lost 4 markers, and gained three, but the total number is the same???</p>
-<p>Okay it’s because the marker names under column “assay” aren’t consistent. Marker Ots_ZR-575 gets renamed as “Ots_sept9-78” in December</p>
+<p>It’s because the marker names under column “assay” aren’t consistent. Marker Ots_ZR-575 gets renamed as “Ots_sept9-78” in December. (it looks like this is an error - see primer probe change section)</p>
 <p>So the changes from February to December are as follows</p>
 <ul>
 <li>add 3 AAM markers<br />
@@ -3043,23 +3043,142 @@ kable(Ots353 %&gt;%
 Our panel has 9 markers that CRITFC doesnt have (note ZR-575 IS in the CRITFC panel under a different name). These are the three test markers they removed in their latest round, plus our SWFSC RoSA markers (stat wtih Ots37124)</p>
 <p><strong>SFGL missing</strong><br />
 Our panel is missing 7 markers that are in the newest CRITFC panel (note sex marker in table above because of the way I pulled these down).<br />
-4 are markers we excluded during our optimization because they were read hogs or had primer-dimer issues.<br />
+4 are markers we excluded during our optimization because they were read hogs or had primer-dimer issues. Interestingly 3 of these are flagged in the CRITFC spreadsheets with “keep at Jon’s request”<br />
 3 are the new AAM markers.</p>
 </div>
 </div>
+<div id="primerprobecorrection_value-changes" class="section level2">
+<h2>Primer/Probe/Correction_value Changes</h2>
+<p>Let’s see if any primer and probe sequences are different.</p>
+<pre class="r"><code>pp_compare &lt;- Ots353 %&gt;%
+  rename(`A1-Probe` = X4, `A2-Probe` = X5, `FWD Primer` = X6, Correction = X7, Correction2 = X8) %&gt;%
+  select(marker,`A1-Probe`, `A2-Probe`, `FWD Primer`, Correction, Correction2 ) %&gt;%
+  left_join(select(critfc_dec21, Assay,`A1-Probe`, `A2-Probe`, `FWD Primer`, Correction, Correction2), by = c(&quot;marker&quot; = &quot;Assay&quot;), suffix = c(&quot;_SFGL&quot;, &quot;_critfc_dec&quot;))
+
+# find differences
+pp_compare %&lt;&gt;%
+  mutate(change_probe = case_when(`A1-Probe_SFGL` !=  `A1-Probe_critfc_dec` ~ TRUE,
+                             `A2-Probe_SFGL` !=  `A2-Probe_critfc_dec` ~ TRUE,
+                             TRUE ~ FALSE)) %&gt;%
+  mutate(change_correction = case_when(Correction_SFGL !=  Correction_critfc_dec ~ TRUE,
+                             Correction2_SFGL !=  Correction2_critfc_dec ~ TRUE,
+                             TRUE ~ FALSE)) %&gt;%
+  mutate(change_primer = case_when(`FWD Primer_SFGL` !=  `FWD Primer_critfc_dec` ~ TRUE,
+                                   TRUE ~ FALSE))
+
+# table of differences
+kable(pp_compare %&gt;%
+        filter(change_correction == TRUE | change_primer == TRUE | change_probe == TRUE) %&gt;%
+      select( sort(current_vars())) %&gt;%
+        relocate(marker, starts_with(&quot;change&quot;))) </code></pre>
+<pre><code>## Warning: `current_vars()` was deprecated in dplyr 0.8.4.
+## Please use `tidyselect::peek_vars()` instead.</code></pre>
+<table>
+<colgroup>
+<col width="4%"></col>
+<col width="5%"></col>
+<col width="4%"></col>
+<col width="4%"></col>
+<col width="7%"></col>
+<col width="7%"></col>
+<col width="7%"></col>
+<col width="7%"></col>
+<col width="7%"></col>
+<col width="5%"></col>
+<col width="7%"></col>
+<col width="5%"></col>
+<col width="11%"></col>
+<col width="11%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">marker</th>
+<th align="left">change_correction</th>
+<th align="left">change_primer</th>
+<th align="left">change_probe</th>
+<th align="left">A1-Probe_critfc_dec</th>
+<th align="left">A1-Probe_SFGL</th>
+<th align="left">A2-Probe_critfc_dec</th>
+<th align="left">A2-Probe_SFGL</th>
+<th align="right">Correction_critfc_dec</th>
+<th align="right">Correction_SFGL</th>
+<th align="right">Correction2_critfc_dec</th>
+<th align="right">Correction2_SFGL</th>
+<th align="left">FWD Primer_critfc_dec</th>
+<th align="left">FWD Primer_SFGL</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Ots_afmid-196</td>
+<td align="left">TRUE</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+<td align="left">CAAAGTCAAAGATCCTATTAAA</td>
+<td align="left">CAAAGTCAAAGATCCTATTAAA</td>
+<td align="left">AAGTCAAAGATCGTATTAAA</td>
+<td align="left">AAGTCAAAGATCGTATTAAA</td>
+<td align="right">1.9</td>
+<td align="right">2.0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="left">CGTGGAGTAGGTGGTTACAGTTTAT</td>
+<td align="left">CGTGGAGTAGGTGGTTACAGTTTAT</td>
+</tr>
+<tr class="even">
+<td align="left">Ots_u202-161</td>
+<td align="left">TRUE</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+<td align="left">AGCTAGTGCTTAGCAGCTA[AC]</td>
+<td align="left">AGCTAGTGCTTAGCAGCTA[AC]</td>
+<td align="left">AGCTAGTGCATAGCAGCTA[AC]</td>
+<td align="left">AGCTAGTGCATAGCAGCTA[AC]</td>
+<td align="right">1.7</td>
+<td align="right">1.5</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="left">CACTTTTGACTTTACATGGAACTTAACTCAT</td>
+<td align="left">CACTTTTGACTTTACATGGAACTTAACTCAT</td>
+</tr>
+<tr class="odd">
+<td align="left">Ots_MetA</td>
+<td align="left">TRUE</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+<td align="left">CCTTAAGCATATTTCT</td>
+<td align="left">CCTTAAGCATATTTCT</td>
+<td align="left">CCTTAAGCGTATTTCT</td>
+<td align="left">CCTTAAGCGTATTTCT</td>
+<td align="right">0.8</td>
+<td align="right">1.6</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="left">GATCATTTATCAAGACTATAGGCTATGGATACG</td>
+<td align="left">GATCATTTATCAAGACTATAGGCTATGGATACG</td>
+</tr>
+<tr class="even">
+<td align="left">Ots_sept9-78</td>
+<td align="left">FALSE</td>
+<td align="left">TRUE</td>
+<td align="left">TRUE</td>
+<td align="left">CC[GA]ACACAATTTTGT</td>
+<td align="left">CTCTTCGATGTCTAGACA</td>
+<td align="left">CC[GA]ACATAATTTTGT</td>
+<td align="left">CTCTTCAATGTCTAGACA</td>
+<td align="right">0.0</td>
+<td align="right">0.0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="left">GCCTACCAGAAAGTACCAATTGTGA</td>
+<td align="left">GTCGATTACCGTTAGCTTCATCCT</td>
+</tr>
+</tbody>
+</table>
+<p>Three markers have different allele correction values and one has a primer and probe change between our panel and the current CRITFC panel.</p>
+<p>The primer change for Ots_sept9-78 is completely different and doesn’t even align to our primer or it’s reverse complement. This is because Ots_sept9-78 appears twice in the critfc excel spreadsheet, and one of the rows is the pesky Ots_ZR-575 marker. Perhaps this is an error in their spreadsheet?</p>
+<p>Yes, everything else in the offending row corresponds to Ots_ZR-575. It looks like this is an error in the spreadsheet.</p>
 </div>
-<div id="future-work-here" class="section level1">
-<h1>Future Work Here</h1>
-<p>Things to do if/when we want to look into it more</p>
-<ul>
-<li>did they make any primer or probe sequence changes?<br />
-</li>
-<li>allele correction value changes?<br />
-</li>
-<li>other things???<br />
-</li>
-<li>same analysis for Omy panel</li>
-</ul>
 </div>
 
 

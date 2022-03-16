@@ -48,7 +48,7 @@ kable(filter(critfc_feb21, !(Assay %in% critfc_dec21$Assay)) %>%
 
 These don't add up, Feb CRITFC panel lost 4 markers, and gained three, but the total number is the same???  
 
-Okay it's because the marker names under column "assay" aren't consistent. Marker Ots_ZR-575 gets renamed as "Ots_sept9-78" in December  
+It's because the marker names under column "assay" aren't consistent. Marker Ots_ZR-575 gets renamed as "Ots_sept9-78" in December. (it looks like this is an error - see primer probe change section)  
 
 So the changes from February to December are as follows
 
@@ -82,14 +82,40 @@ Our panel has 9 markers that CRITFC doesnt have (note ZR-575 IS in the CRITFC pa
 
 __SFGL missing__  
 Our panel is missing 7 markers that are in the newest CRITFC panel (note sex marker in table above because of the way I pulled these down).   
-4 are markers we excluded during our optimization because they were read hogs or had primer-dimer issues.  
+4 are markers we excluded during our optimization because they were read hogs or had primer-dimer issues. Interestingly 3 of these are flagged in the CRITFC spreadsheets with "keep at Jon's request"  
 3 are the new AAM markers.
 
-# Future Work Here
+## Primer/Probe/Correction_value Changes
 
-Things to do if/when we want to look into it more
+Let's see if any primer and probe sequences are different.
+```{r}
+pp_compare <- Ots353 %>%
+  rename(`A1-Probe` = X4, `A2-Probe` = X5, `FWD Primer` = X6, Correction = X7, Correction2 = X8) %>%
+  select(marker,`A1-Probe`, `A2-Probe`, `FWD Primer`, Correction, Correction2 ) %>%
+  left_join(select(critfc_dec21, Assay,`A1-Probe`, `A2-Probe`, `FWD Primer`, Correction, Correction2), by = c("marker" = "Assay"), suffix = c("_SFGL", "_critfc_dec"))
 
-- did they make any primer or probe sequence changes?  
-- allele correction value changes?  
-- other things???  
-- same analysis for Omy panel
+# find differences
+pp_compare %<>%
+  mutate(change_probe = case_when(`A1-Probe_SFGL` !=  `A1-Probe_critfc_dec` ~ TRUE,
+                             `A2-Probe_SFGL` !=  `A2-Probe_critfc_dec` ~ TRUE,
+                             TRUE ~ FALSE)) %>%
+  mutate(change_correction = case_when(Correction_SFGL !=  Correction_critfc_dec ~ TRUE,
+                             Correction2_SFGL !=  Correction2_critfc_dec ~ TRUE,
+                             TRUE ~ FALSE)) %>%
+  mutate(change_primer = case_when(`FWD Primer_SFGL` !=  `FWD Primer_critfc_dec` ~ TRUE,
+                                   TRUE ~ FALSE))
+
+# table of differences
+kable(pp_compare %>%
+        filter(change_correction == TRUE | change_primer == TRUE | change_probe == TRUE) %>%
+      select( sort(current_vars())) %>%
+        relocate(marker, starts_with("change"))) 
+```
+
+Three markers have different allele correction values and one has a primer and probe change between our panel and the current CRITFC panel.
+
+
+The primer change for Ots_sept9-78 is completely different and doesn't even align to our primer or it's reverse complement. This is because Ots_sept9-78 appears twice in the critfc excel spreadsheet, and one of the rows is the pesky Ots_ZR-575 marker. Perhaps this is an error in their spreadsheet?
+
+Yes, everything else in the offending row corresponds to Ots_ZR-575. It looks like this is an error in the spreadsheet.
+
