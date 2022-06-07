@@ -16,13 +16,12 @@ output:
 ```{r, message=FALSE, warning=FALSE}
 require(tidyverse)
 require(DiagrammeR)
-require(poppr)
-require(genepop)
-require(graph4lg)
-require(related)
+#require(related) # don't need to install or use this package unless running duplicate filtering (for messy batch samples)
 require(adegenet)
 require(knitr)
 require(magrittr)
+require(lme4)
+
 ```
 
 This is document is an R notebook. If you'd like view to pre-rendered figures, read a summary of analysis and interact with code, please open the relevant html file in a browser. 
@@ -890,6 +889,13 @@ Next we do the same process, but at the final filtering levels:
 - Missingness (loci) > 20%
 
 ```{r}
+
+#let's update the %gt field
+genos_0.3 %<>% #dont forget to change to the correct dataset
+    rowwise %>%
+    mutate(`%GT` = 100*(1-sum((cur_data() == "00"), na.rm = TRUE)/(ncol(.)-8))) %>% #change number
+    ungroup() #always ungroup after rowwise
+
 #print table of bad missingness individual
 kable(genos_0.3 %>%
   filter(`%GT` < 90) %>%
@@ -988,7 +994,6 @@ miss_mod <- miss0.1[miss0.1$missingness3 < 0.2, 2]
 Next, markers with skewed allele count ratios and allele ratios with high variance. We do this by fitting a linear model between allele 1 counts and allele 2 counts and then flagging markers with a ratio of > 1.5 (3/2) and less than 2/3. We also flag markers where the fit 
 
 ```{r, warning = FALSE, message= FALSE}
-library(lme4)
 hets <- filter(marker_info, called_geno == "HET" | is.na(called_geno))
 
 models <- hets %>%
@@ -1095,7 +1100,7 @@ genos_1.0 <- genos_0.5 %>%
 
 __Duplicate Samples__
 
-Some sample tissues are provided in batches of fin clips introducing the possibility for unknown duplicates in the sample. Let's make sure no fin clips broke apart leading to a single individual to be represented twice in the dataset. __You may not want to run this if you are confident your samples do not contain duplicates__ Rather than fussing with installing coancestry for windows on a unix system, estimated relatedness using an R package (related) which can implement the code from Coancestry on any operating system. 
+Some sample tissues are provided in batches of fin clips introducing the possibility for unknown duplicates in the sample. Let's make sure no fin clips broke apart leading to a single individual to be represented twice in the dataset. __You may not want to run this if you are confident your samples do not contain duplicates. Installing and running the related package can be difficult so skip this if your fin clips came in individual tubes __ Rather than fussing with installing coancestry for windows on a unix system, estimated relatedness using an R package (related) which can implement the code from Coancestry on any operating system. 
 
 Alternatively, to run the code in Coancestry on a windows machine, use the GUI.
 
@@ -1103,6 +1108,8 @@ We used the estimator from Lynch and Ritland 1999 #not dyadic likelihood estimat
 ```{r, eval=FALSE}
 # Local R
 
+
+require(related)
 # The input file for coancestry needs a unique row for each indiviudal and two columns for each diploid locus, and alleles as integers
 # throw out metadata and sex marker and wrote to a file
 just_genos <- genos_1.0[,c(2, c(9:(ncol(genos_1.0)-1)))] #note possible hardcoding here (just like missingness), if this breaks edit the columns so that it grabs only the simple sample name and genotype data
