@@ -11,6 +11,6 @@ __(8) Albacore_gtseq_panel_1.0.xlsx:__ First trial albacore GTseq panel info
 __(9) Rosa Primer Sequences.xlsx:__ Additional Ots28 marker information for SWFSC RoSA markers  
 __(10) Albacore_gtseq_panel_289.xlsx:__ Albacore GTseq panel info for panel after Campbell optimization __USE THIS ONE__  
 __(11) Omy CRTIFC GTSEQ panel info...Dec2021.xslx:__ panel information from Dec 2021 O. mykiss CRITFC panel __latest one__  
-__(12) Ots2022_critfc_comparison.html (and .rmd)__ Notebook comparing Ots353 panel to CRTIFC panels
-__(13) Sco_GTseq266 primer sequences.xlsx:__ Bull Trout GTseq primer sequences
-__(14) Sco_GTseq266_PanelInfo.xlsx:__ Bull Trout GTseq panel information 
+__(12) Ots2022_critfc_comparison.html (and .rmd)__ Notebook comparing Ots353 panel to CRTIFC panels  
+__(13) Sco_GTseq266 primer sequences.xlsx:__ Bull Trout GTseq primer sequences  
+__(14) Sco_GTseq266_PanelInfo.xlsx:__ Bull Trout GTseq panel information   
