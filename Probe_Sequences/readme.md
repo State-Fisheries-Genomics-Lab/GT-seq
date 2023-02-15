@@ -13,7 +13,7 @@
 (4) Ots_335_probe_seqs.txt: Does not include latest Ots28 markers  
 (5) **Ots352: USE THIS ONE** david's best guess as to what is actually in the panel (exclude read hogs, add back the excluded rosa marker (note that I included the reverse primer as FWD primer and changed the SNP codes and probes to their reverse complements), include "miscellaneous plate")  
 
-<b>O. kisutch:  </b>  
+<b>O. keta:  </b>  
 
 (1) Oke_GTseq350_ProbeSeqs.csv: Full Oke probe sequence file
 
