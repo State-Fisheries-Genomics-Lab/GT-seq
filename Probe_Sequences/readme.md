@@ -2,8 +2,8 @@
 
 <b>O mykiss probes:</b>  
 
-(1) Omy_392_probe_seqs.csv: USE THIS ONE probe sequences for the SFGL O mykiss panel as of December 2020, corrected alleles for the Omy05 residency markers. Actually Omy391 as Omy_RAD47080-54 (which is a duplicate to Omy_RAD15709-53) is removed. Species marker Oki120255-113 is added.  
-(2) Omy_390_probe_seqs.csv: <b>USE THIS ONE</b> probe sequences for the SFGL O mykiss panel as of December 2020, corrected alleles for the Omy05 residency markers. Omy_RAD47080-54 (which is a duplicate to Omy_RAD15709-53) is removed.   
+(1) Omy_391_probe_seqs.csv: <b>USE THIS ONE</b> probe sequences for the SFGL O mykiss panel as of December 2020, corrected alleles for the Omy05 residency markers. Omy_RAD47080-54 (which is a duplicate to Omy_RAD15709-53) is removed. Species marker Oki120255-113 is added.  
+(2) Omy_390_probe_seqs.csv: probe sequences for the SFGL O mykiss panel as of December 2020, corrected alleles for the Omy05 residency markers. Omy_RAD47080-54 (which is a duplicate to Omy_RAD15709-53) is removed.   
 (3) Omy_390_probe_seqs_uncorrected.csv: probe sequences for the SFGL O mykiss panel as of December 2020, does not contain corrected alleles for the Omy05 residency markers  
 
 <b>O. tshawytscha:  </b> 
