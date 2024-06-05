@@ -18,7 +18,7 @@
 
 (1) Oke_GTseq350_ProbeSeqs.csv: Full Oke probe sequence file
 
-<b> Thunnus alalunga (Albacore): </b>  
+<b> T. alalunga (Albacore): </b>  
 
 (1) Tal289_probe_seqs.csv: Updated (Feb 2022) to include Nate Campbell's optimized allele correction values and probe sequences. 
 
